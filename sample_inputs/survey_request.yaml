@@ -1,0 +1,11 @@
+# ALT 입력 예시. 필수는 topic, approach, years 세 개.
+topic: Wave loads on offshore structures
+approach: data-driven
+years: 2025-2027
+
+# 선택 (없으면 기본값)
+seed_dois: []            # 이미 찾은 논문 DOI
+language: ko             # ko / en
+max_selected: 30
+purpose: 사내 보고       # 사내 보고 / 학회 / 과제 제안
+exclude_keywords: []

@@ -1,0 +1,6 @@
+{
+  "name": "alt-marketplace",
+  "metadata": {"description": "ALT literature survey tools"},
+  "owner": {"name": "Sangyeobk"},
+  "plugins": [{"name": "alt", "source": "./", "description": "Agentic Literature Tracker"}]
+}

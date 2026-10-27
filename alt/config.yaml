@@ -1,0 +1,205 @@
+# ALT 설정. 숫자·이름은 여기에만 둔다 (계산 코드에 직접 쓰지 않음).
+# 출처 표시: [사용자] = 사용자 결정, [제안] = Claude 제안값(추정, 시험 후 확정 필요)
+
+search:
+  per_query_max_records: 200      # [제안] 검색어 1개당 최대로 가져올 편수
+  seed_expand_max_records: 100    # [제안] 시드 논문 1편당 인용·피인용 확장 최대 편수
+  cocited:                        # [사용자 2026-10-19] 공통 인용 보강(add_cocited.py, docs/20261016_놓친고전_계획.md) — 검색이 놓친 분야 고전을 더해 채점 → ⑤에서 별도 목록(scoring.cocited)
+    min_relevance: 4              # [사용자] 이 점수 이상 후보들의 참고문헌을 셈
+    min_share: 0.10               # [사용자] 그 편수의 10% 이상이 공통 인용 (선박 연료 186편 → 19편 이상)
+    min_count: 5                  # [제안] 기준 후보가 적어도 최소 이 편수 이상 공통 인용
+  openalex_fields:                # 후보 파일에 담을 OpenAlex 필드
+    - id
+    - doi
+    - title
+    - publication_year
+    - type
+    - cited_by_count
+    - fwci
+    - citation_normalized_percentile
+    - primary_location
+    - open_access
+    - authorships
+    - abstract_inverted_index
+    - referenced_works
+    - is_retracted
+
+integrity:
+  exclude_notice_types: [retraction, withdrawal, removal]   # Crossref 공지 종류 중 제외 대상
+  flag_notice_types: [expression_of_concern]               # 표시만
+  crossref_workers: 3                                      # [제안] Crossref 동시 요청 수
+
+relevance:
+  abstract_chars: 1500            # [제안] 채점에 넘길 초록 최대 글자 수
+  batch_max_kb: 190               # [제안] 채점 묶음 파일 최대 크기 — Read 한 번에 읽히는 범위에서 크게 (2026-10-27 실측: 198 KB를 한 번에 읽음,
+                                  #   60 KB×4묶음은 에이전트 기본 문맥이 4번 들어 130편 기준 +45% — 묶음은 적을수록 유리)
+  parallel_agents: 6              # [제안] 채점 에이전트를 동시에 띄우는 최대 수 (묶음이 많으면 차례로)
+  axis_batch_min_tokens: 20000    # [제안] 축 AI 분류에서 읽을 글이 이보다 적으면 묶음 1개 (에이전트 고정 문맥 약 12k가 글보다 큼 — 10-16 실측)
+
+scoring:
+  weights:                        # [사용자 2026-10-19 확정] 0.5 / 0.3 / 0.2 (Claude 제안값 그대로) → 인용만 바꿈 (아래). 총점은 가중치 합으로 나눈 가중평균
+    relevance: 0.5
+    citation: 0.6                 # [사용자 2026-10-27] 인용 가중치 2배 (0.3 → 0.6) — 새 조사부터. 기존 세 조사는 0.3으로 만든 결과 그대로 (scored.json meta에 기록)
+    venue: 0.2
+  min_relevance: 4               # [사용자] 관련성 4점 이상만 선정 대상 (리뷰는 review.min_relevance 따로)
+  category_weights:               # [사용자] 저널 논문에 가장 큰 가중치. 값은 [사용자 2026-10-19 확정](제안값 그대로), 실행 때 사용자가 바꿀 수 있음
+    journal: 1.0
+    conference: 0.85
+    preprint: 0.7
+    other: 0.7
+    institution: 1.0              # 기관·선급 문서 — 핵심논문과 경쟁하지 않으므로 선정에는 쓰이지 않음 (총점 표시용)
+  min_total_score: 0.60           # [사용자] 시험 주제(파랑하중·데이터 기반·2025–2027)에서 교차 검증 반영 후 30편이 되도록 보정 (2026-10-13)
+  min_total_score_basis: 시험 주제에서 선정이 30편이 되도록 정한 값   # 보고서 '검색·선정 방법'에 그대로 씀 — 기준을 바꾸면 함께 고칠 것
+  max_selected: 30               # [사용자] 최대 30편, 미달은 제외 → 실제 편수 유동
+  review:                         # [사용자] 리뷰(문헌조사) 논문은 30편과 따로 관리
+    title_pattern: '\b(review|survey|state[- ]of[- ]the[- ]art|overview)\b'   # Claude 판정(is_review)이 없을 때만 사용
+    min_relevance: 3              # [제안] 관련성 3점 이상인 리뷰만 목록에 올림
+    max_listed: 4                 # [사용자 2026-10-15] 문헌조사논문 최대 4편 — 상한일 뿐 채우지 않음 (본문 기여 평가 review_rubric.md 통과분만)
+  institutions:                   # [사용자 2026-10-16] 기관·선급 문서 = 문헌의 한 카테고리 — 핵심논문과 따로 목록 (문헌조사논문처럼)
+    names: [ISSC, ITTC, IMO, International Maritime Organization, IACS, International Association of Classification Societies,
+            DNV, American Bureau of Shipping, ABS, "Lloyd's Register", Bureau Veritas, Korean Register, ClassNK, Nippon Kaiji Kyokai,
+            RINA, China Classification Society]   # [사용자 2026-10-19 확정] 실린 곳·발행처 이름에 이 단어가 있고 학술지가 아니면 기관·선급 문서
+    doc_words: [committee, report, guideline, guidelines, guidance, rules, recommended procedure, resolution, circular]
+                                  # [사용자 2026-10-19 확정] 제목에 기관 이름 + 이 단어가 함께 있으면 실린 곳과 상관없이 기관·선급 문서 (예: 'Report of ISSC Committee…' 저장소 사본·학술지 요약본 — 10-16 OpenAlex 확인)
+    min_relevance: 3              # [사용자 2026-10-19 확정] 목록에 올릴 관련성 하한
+    max_listed: 10                # [사용자 2026-10-19 확정] 검색으로 찾은 문서 최대 수 (사용자 제공 PDF는 따로, 모두 올림)
+  adjacent:                       # [사용자 2026-10-16] 주목할 인접 문헌 — 관련성은 낮지만 인용·학술지 점수가 높은 연구논문을 핵심논문과 따로 (문헌조사논문처럼)
+    min_relevance: 2              # [사용자] 관련성 2–3점 (선정 하한 min_relevance 미만) — 2점은 제외 범위 논문이 섞일 수 있음
+    min_impact: 0.8               # [제안] 영향 점수(인용·학술지 가중평균 × 문헌 종류 가중치, 후보 안 상대 순위) 하한
+    max_listed: 5                 # [사용자] 최대 5편 — 상한일 뿐 채우지 않음
+  cocited:                        # [사용자 2026-10-19] 공통 인용 고전(add_cocited.py로 더한 문헌) — 핵심논문과 따로 목록, 핵심논문 점수의 백분위 모집단에서 뺌
+    min_relevance: 4              # [사용자] 관련성 4점 이상
+    max_listed: 10                # [사용자] 공통 인용 많은 순 최대 10편 — 상한일 뿐 채우지 않음
+  no_abstract_min_citation: 0.5   # [사용자 2026-10-19 규칙·값 확정] 초록 없는 후보는 인용 백분위(후보 안 FWCI)가 이보다 낮으면 제외, 높거나 인용 정보가 없으면 제목으로 채점(전문 확인 필요)
+  no_abstract_max_relevance: 4    # [사용자 2026-10-19] 초록·본문 정리 없이 제목만으로 채점한 논문은 관련성 4점까지만 인정 (제목만으로 5점·1위 방지, 본문 읽은 논문 제외)
+  recent_citation_window_years: 2 # [사용자] 최근 2년 논문은 "인용 집계 기간 짧음" 표시
+  report_thresholds: [0.55, 0.58, 0.6, 0.63, 0.65, 0.7]   # 중간 확인 때 보여 줄 기준별 편수
+
+verification:                     # [사용자] 다른 AI로 교차 검증 (Claude Code 실행 → Codex 검증, Codex 실행 → Claude 검증)
+  default_verifier: codex
+  borderline_count: 10            # [제안] 선정 바로 아래 경계 논문 몇 편을 표본에 넣을지
+  timeout_seconds: 1800           # [제안]
+
+open_access:
+  max_pdf_mb: 50                  # [제안] 받을 PDF 최대 크기
+  library_dir: outputs/references # [사용자 2026-10-22] 모든 조사의 전문 PDF·맥락 정리를 모아 두는 레퍼런스 폴더 (파일 이름 '저자성연도_DOI.pdf')
+
+revision:                         # 피드백 부분 수정(revise_synthesis.py) 구조 검사 — synthesis_guide.md '형식'과 실제 요약 파일에서 옮김
+  free_key_fields: [abbreviations, keyword_matrix, pages]   # 키가 데이터(약어·분야/키워드 id·논문 키)인 사전 → 키 모음은 비교하지 않고 값 자료형만
+  optional_fields:                  # 항목마다 있을 수도 없을 수도 있는 칸 → 새로 생기거나 빠져도 허용. 값 = 자료형 기준 예시 (기존 요약 파일에 쓰인 형식)
+    source: "일반 개념"
+    pages: {"Kim2025": 7, "Lee2026": "10–11"}               # 쪽 번호는 정수 또는 쪽 범위 글자
+  identity_fields: [id, key, name]  # 목록 항목을 찾고(대상 subtopics#T3) 고치기 전·후로 짝짓는 칸
+  nullable_examples:                # 칸은 늘 있지만 값이 비어(null) 있을 수 있는 칸 → 빈 칸을 채울 때의 자료형 기준 예시
+    link: "https://example.org"                             # 자료·공개 코드 링크 — 없으면 null (기존 파일 11–25곳)
+
+fulltext:
+  reading_mode: abstract          # [사용자] abstract = 초록만(기본, 토큰 비용 낮음 — Pro 사용자 고려) / full = 받아 둔 전문은 읽음(없으면 초록). 실행 때 선택
+  context_statuses: [selected, review_listed]   # [사용자 2026-10-16] 맥락 정리(본문 정리) 대상 — 이 상태 논문 중 PDF가 있는 것 전부 (기관·선급 문서 제외)
+  figure_targets: priority        # [사용자 2026-10-16] 그림 고르기 대상: priority = 요약 conclusion.fulltext_priority의 선정 논문 / all = 맥락 정리한 선정 논문 전부
+  papers_per_batch: 1             # [사용자 2026-10-15] 하위 에이전트 1개가 맡을 논문 수 — 1이면 앞 논문을 들고 다니는 반복 비용이 없음
+  references_headings: [References, REFERENCES, Bibliography, 참고문헌]   # 이 제목 뒤(참고문헌 목록)는 잘라 분량을 줄임
+  trim_section_words: [introduction, literature review, related work, related works, background, state of the art]
+                                  # [사용자 2026-10-15] 번호 붙은 이 절(서론·선행연구)은 다음 번호 절 전까지 잘라 분량을 줄임 (쪽 표시는 남김)
+  max_trim_ratio: 0.5             # [제안] 잘라낼 분량이 이보다 크면 제목 인식이 틀린 것으로 보고 자르지 않음
+  chars_per_token: 4              # [제안] 사용량 추정용 — 영어 논문 약 4글자 = 1토큰 (추정치)
+  min_text_chars: 2000            # [제안] 추출한 글이 이보다 짧으면 본문을 못 읽은 것으로 봄 (스캔본·표지만 있는 PDF)
+  min_figure_pixels: 90000        # [제안] 이보다 작은 이미지(가로×세로)는 로고·아이콘으로 보고 버림 (약 300×300)
+  page_render_dpi: 150            # [제안] 그림 이미지가 없는 캡션 쪽(벡터 도표·표)을 그림으로 바꿀 해상도
+  figure_crop_first_gap: 90       # [제안] 쪽 그림 자르기: 캡션과 그림 사이 첫 간격 허용(pt) — 축 이름·범례 글이 끼어 있음
+  figure_crop_gap: 45             # [제안] 그림(Figure) 개체끼리 이 간격(pt) 안이면 한 그림으로 묶음
+  figure_crop_line_gap: 14        # [제안] 표(Table)는 글·선을 이 줄 간격(pt) 안에서 이어 가다 마지막 선에서 자름
+  figure_crop_page_band: 0.1      # [제안] 쪽 위·아래 이 비율 띠 안에만 있는 개체(머리글 줄·쪽 번호)는 뺌
+  figure_crop_margin: 8           # [제안] 잘라 낼 범위 바깥 여백 (pt)
+  figure_max_side: 1600           # [제안] 그림 저장 때 긴 변 최대 픽셀
+  figure_jpeg_quality: 85         # [제안] JPEG 화질
+  figures_per_paper: 2            # [사용자 범위·제안 값] 본문 정리 때 논문당 고를 대표 그림 최대 수
+
+usage:                            # [사용자 2026-10-16] 큰 단계는 5시간 한도 대비 예상 %를 보여 주고 승인받은 뒤 실행 (usage_log.py budget)
+  reference_tokens:               # [제안] 단계별 누적 처리량 기준값 (장부 total 기준). null = 실측 없음 → 첫 실행 장부로 채움
+    관련성: {per: paper, tokens: 3050}      # 실측 10-16: 전용 에이전트(opus) 130편 396,454
+    본문정리: {per: fulltext, tokens: 278000}  # 실측 10-16: 전용 에이전트 1편 277,804 (가장 짧은 전문 4만 자 — 긴 논문은 더 큼). 그림까지 고르던 깊은 정리 기준 — 맥락 정리(그림 없음)는 더 작을 것으로 보나 실측 전이라 상한으로 씀
+    문헌조사논문평가: {per: run, tokens: null}
+    요약: {per: run, tokens: null}            # Agent 보고값(230–265k)은 누적이 아니라 기준값으로 쓰지 않음
+  overrun_factor: 1.5             # [사용자 2026-10-19 확정] 실제가 추정의 이 배수를 넘으면 멈추고 다시 묻기
+  calibration_path: ~/.alt/usage_calibration.jsonl   # 단계 전후 5시간 사용률 기록 (PC마다, 계정 기준)
+
+output:
+  default_language: ko           # [사용자] 실행 때 선택, 기본 ko
+  default_variant: 초록            # [사용자 2026-10-15] 결과 판 이름 — 요약·산출물 파일 끝에 붙음 (전문 모드 기본은 전문활용). 결과 폴더는 하나
+  font: Malgun Gothic             # 그림·문서 글꼴 (맑은 고딕)
+  table_keep_rows: 20             # [제안] 보고서 표가 이 행 수 이하면 쪽에서 나누지 않고 통째로 다음 쪽으로 (사용자 피드백 2026-10-19)
+  tech_keyword_color: "00B050"    # [제안] 기술 핵심어(요약 tech_keywords) 글자색 — 보고서·발표 본문 (사용자 피드백 2026-10-19)
+  pptx_template: "01"             # [사용자 2026-10-21] 쓸 발표 양식 (아래 pptx_templates의 이름). 파일이 없으면 plain
+  # 발표 양식 (사용자 결정 2026-10-21 — 글꼴은 전부 맑은 고딕, 강조색은 양식에 맞춤). 양식 파일은 templates/에만 (git에 올리지 않음)
+  #   slides: 양식 파일에서 쓸 장 번호(1부터) — cover 표지, closing 마무리(출처 표시 장), section 장 구분(번호·장 이름), body 본문 꾸밈을 복사할 장
+  #   content_box: 본문을 넣을 영역 [왼쪽, 위, 폭, 높이] cm — 코드의 33.9×19.1 cm 화면을 비율대로 넣음
+  #   colors: title 제목 / subtitle 소제목 / text 본문 / emphasis 강조 줄 / box_fill·box_text 핵심 상자·번호 칸 / header_fill 표 머리 행
+  #           highlight_fill·highlight_text 흐름도 강조 칸 / arrow 흐름도 화살표 / annotation 원문 그림 번호·주석 / tech 기술 핵심어
+  pptx_templates:
+    "01":                         # Slidesgo 'Elegant Black & White Thesis Defense' — 무료 이용 조건: Thanks 장(출처 표시) 유지, 양식 배포 금지
+      file: "templates/01_Template_Elegant Black & White Thesis Defense by Slidesgo.pptx"
+      catalog: templates/01_catalog.yaml   # 장 종류 목록 — 있으면 04_발표는 구성안(slides.json)으로 다시 씀 (사용자 결정 2026-10-21)
+      slides: {cover: 1, closing: 28, section: 4, body: 16}   # 구성안 없이 만드는 01_배경학습용
+      content_box: [0.85, 0.85, 23.7, 12.6]
+      drop_frame: true            # [사용자 2026-10-21] 양식의 바깥 테두리·가운데 구분선은 쓰지 않음
+      drop_fill_colors: ["E7E7E7"]   # [사용자 2026-10-21] 회색 원·면(배치 의미 없음) 지움 (drop_frame과 함께)
+      title_shift: [-1.2, -0.75]  # [사용자 2026-10-21] 본문 장 제목을 왼쪽 위로 (cm) — 값은 Claude 제안
+      cover_sizes: [24, 18]      # [제안] 표지 큰 글상자의 첫 줄·나머지 줄 글자 크기 (pt) — 양식 원래 38pt는 한글 제목이 넘침
+      closing_drop: ["@", "+34", "website"]   # 마무리 장에서 지울 예시 연락처 줄 (출처 문구는 남김)
+      body_bold: false
+      # 그림 소개 장도 일반 본문 장과 같은 상단 제목. 기존 구성안의 headline 키는 유지.
+      figure_side_layout:
+        title_from: points3
+        text_box: [1.0, 3.1, 10.5, 9.4]
+        image_box: [12.0, 2.3, 12.4, 11.3]
+        text_roles: [그림 소개, 읽는 순서, 확인할 지점]
+        text_lines: 4
+        text_space_after_pt: 14
+      subtitle_underline: false
+      colors: {title: "333333", subtitle: "777777", text: "333333", emphasis: "000000", box_fill: "333333", box_text: "FFFFFF",
+               header_fill: "E8E7E7", highlight_fill: "333333", highlight_text: "FFFFFF", arrow: "B2B2B2", annotation: "FF0000", tech: "000000"}
+    plain:                        # 양식 파일 없음 — 무늬 없는 16:9 (공개 저장소에서 받은 사람 기본). 예전 KR 양식 색
+      file: null
+      body_bold: true
+      subtitle_underline: true
+      colors: {title: "002060", subtitle: "002060", text: "000000", emphasis: "FF0000", box_fill: "FFF2CC", box_text: "000000",
+               header_fill: "D9D9D9", highlight_fill: "FFFF00", highlight_text: "000000", arrow: "002060", annotation: "FF0000", tech: "00B050"}
+  # [사용자] 보고서·발표 장 순서와 포함 여부 (alt/report_guide.md의 장 id). 개인 설정 ~/.alt/settings.yaml의 같은 키가 우선
+  #   상세 표는 05_참고문헌.xlsx로 보내고 본문에는 안내(appendix_excel)만 둔다 [사용자 2026-10-15]. 표 부록을 다시 넣으려면
+  #   appendix_methods, appendix_excluded, appendix_counts, appendix_reviews, appendix_data, appendix_terms 를 추가
+  #   [사용자 2026-10-15] 본문 = 인사이트(핵심 인사이트 → 기술 흐름·분포 → 분야별 대표 연구 → 후속 검토 쟁점 → 결론),
+  #   조사 과정(목적·범위, 검색·선정, 다음 단계)은 부록
+  #   [사용자 2026-10-15] 조사 목적과 범위(purpose)는 맨 앞 — 핵심 키워드를 처음 소개
+  report_sections: [purpose, summary, landscape, subtopics, issues, conclusion, appendix_method, appendix_next, appendix_adjacent, appendix_excel, references]   # appendix_adjacent [사용자 2026-10-16]
+  slide_sections: [purpose, summary, landscape, subtopics, issues, conclusion, appendix_method, appendix_adjacent, appendix_excel]
+  role_labels: {핵심: 하중·유체력 특성, 확장: 활용(응답·평가)}   # 분야 역할 표시 이름 ('핵심논문'과 헷갈리지 않게) — 시험 주제 값.
+                                                               # [사용자 2026-10-16] 주제마다 synthesis role_names가 정하고, 없을 때만 이 값
+  placeholder_phrases: [선택한 접근법, 선택한 주제, 이 분야를 정리, 주제를 한 장, 에서 보이는 것]
+                                  # [사용자 2026-10-16] 실제 이름 대신 쓰는 자리표시 말 — check_terms.py가 산출물에서 찾으면 실패
+  cite_shown: 3                  # [사용자] 보고서·발표 본문에 보이는 인용 키 수 (나머지는 '외 N편')
+  table_cite_shown: 2            # [사용자 2026-10-27] 보고서 표·강조 상자 안 인용은 쪽 번호 없이 키 최대 2개
+  head_max_chars: 24              # '머리말: 설명'에서 머리말로 굵게 볼 최대 글자 수
+  map_label_top_n: 10            # [사용자] 문헌지도에 이름표를 붙일 상위 편수
+  map_min_relevance: 3            # [사용자] 문헌지도에 넣을 관련성 하한 (선정 외 후보도 회색으로 표시)
+  gap_matrix_min_relevance: 3     # [제안] 공백 행렬은 관련성 3점 이상 후보 전체로 센다 (분야 전체 분포를 보기 위해)
+  data_source_labels: [수치해석, 모형시험, 현장계측]   # [제안] 논문별 학습·검증 자료 분류 (synthesis method_comparison[].data_source, 초록 판독). 없으면 '미기재'
+  approach_labels:                # 채점 결과의 접근법 태그 → 표시 이름
+    data-driven: 데이터 기반
+    hybrid: 하이브리드
+    theory: 이론
+    cfd: CFD
+    experiment: 실험
+    other: 기타
+  structure_axis_name: 구조물       # 확정 주제에 축(topic.json axis)이 없을 때 문헌지도·분포 행렬 가로축 이름 (첫 시험 주제 방식)
+  axis_unknown_label: 초록에 없음    # [사용자 2026-10-16] 주제별 축에서 제목·초록(·본문 정리)에 근거가 없는 논문 — 추측 배정 안 함
+  structure_groups:               # [제안] 구조물 표시 묶음. 위에서부터 단어가 처음 맞는 묶음으로 넣는다
+    - [모노파일·재킷, [monopile, tripod, jacket, offshore wind foundation]]
+    - [부유식 풍력, [floating wind, fowt, offshore wind turbine]]
+    - [반잠수식, [semi-submersible]]
+    - [스파·TLP, [spar, tlp]]
+    - [고정식 플랫폼, [fixed platform, jack-up]]
+    - [FPSO·선박, [fpso, vessel, ship]]
+    - [라이저·계류·배관, [riser, mooring, pipeline, cable]]
+    - [파력·기타 부유체, [wave energy, wec, photovoltaic, floating pv, floating, platform, pen, bridge, multi-body]]
+    - [일반·미지정, [generic, none, subsea, '']]

@@ -1,0 +1,8 @@
+{
+  "name": "alt",
+  "version": "0.1.0",
+  "description": "Agentic Literature Tracker: evidence-based literature surveys",
+  "author": {"name": "Sangyeobk"},
+  "license": "MIT",
+  "repository": "https://github.com/Sangyeobk/ALT"
+}
