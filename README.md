@@ -34,59 +34,35 @@ The policy source for both tools is [`alt/agent_guide.md`](alt/agent_guide.md).
 [`skills/run/SKILL.md`](skills/run/SKILL.md) defines the shared steps.
 Private project logs are preserved separately and are not required in a public installation.
 
-## Requirements
-- [Claude Code](https://claude.com/claude-code) (terminal or desktop app) or [OpenAI Codex CLI](https://github.com/openai/codex) (tested: Codex CLI 0.163 plugin install)
-- [Git](https://git-scm.com/download/win) — needed for the terminal `claude plugin` install from GitHub (Windows: install Git for Windows, open a new terminal, check `git --version`)
-- [Python 3.12](https://www.python.org/downloads/windows/) (the tested version) — when installing, tick **Add python.exe to PATH**. If it is missing, `/alt:run` shows this link and can install it for you with winget
-- Windows is the tested platform (paths in `SKILL.md` assume it). Network access to api.openalex.org, api.crossref.org and api.unpaywall.org.
-- For default independent verification: the other AI CLI must be available and authenticated (Codex verifies Claude results; Claude verifies Codex results). Explicit run-specific exceptions are recorded, not treated as successful verification.
-
 ## Install
 
-The same repository installs in **Claude Code** and **Codex** (Codex reads the Claude marketplace format).
+You need **Windows** and **[Python 3.12](https://www.python.org/downloads/windows/)** (tick *Add python.exe to PATH* when installing — if Python is missing, ALT shows this link and can install it for you).
 
-**Claude desktop app (no command line needed).** Settings → **Plugins** → **+ Add** → add from a repository (Korean UI: 플러그인 → + 추가 → 저장소에서 추가) → enter `Sangyeobk/ALT` → install **alt**. Then open a session in your working folder and type `/alt:run`.
+| | Claude (desktop app) | Codex |
+|---|---|---|
+| Install | Settings → **Plugins** → **+ Add** → **Add from repository** → `Sangyeobk/ALT` → install **alt** | In a terminal:<br>`codex plugin marketplace add Sangyeobk/ALT`<br>`codex plugin add alt@alt-marketplace` |
+| Start | Open a session in the folder where results should go, type `/alt:run` | Open Codex in that folder, type `$alt:run` |
 
-**Claude Code — terminal commands.** In PowerShell or any terminal:
-```text
-claude plugin marketplace add Sangyeobk/ALT
-claude plugin install alt@alt-marketplace
-```
-The terminal, the desktop app's local sessions and the VS Code extension on one computer share the same settings, so a plugin installed this way is also available in the desktop app's Code tab ([docs](https://code.claude.com/docs/en/plugins/install.md)). In the desktop app, typing `/plugin …` opens the Plugins settings instead of running the command — use the menu above. If `claude` is not found in a terminal, install the Claude Code command-line tool first ([setup](https://code.claude.com/docs/en/setup)).
+That's all — ALT sets up its own Python packages on the first run and asks for anything else it needs.
 
-Alternatively, inside a terminal `claude` session:
-```text
-/plugin marketplace add Sangyeobk/ALT
-/plugin install alt@alt-marketplace
-```
-Then start a new session in your working folder and type `/alt:run`. For a local checkout, launch `claude --plugin-dir .` instead.
+<details>
+<summary>Other ways to install, and manual setup</summary>
 
-Codex CLI — in a terminal:
-```text
-codex plugin marketplace add Sangyeobk/ALT
-codex plugin add alt@alt-marketplace
-```
-Then start a Codex session in your working folder and type `$alt:run`.
+- **Claude Code from a terminal** (needs [Git](https://git-scm.com/download/win)): `claude plugin marketplace add Sangyeobk/ALT` then `claude plugin install alt@alt-marketplace`. The terminal and the desktop app share settings, so it also appears in the desktop app. Inside a terminal `claude` session the same works as `/plugin marketplace add …` / `/plugin install …` (in the desktop app `/plugin` only opens the Plugins settings).
+- **Development checkout**: `claude --plugin-dir .` from this folder.
+- **Python packages by hand** (normally automatic, `alt/setup_env.py`), in PowerShell from the plugin folder — keep the environment outside synced folders such as OneDrive:
+  ```powershell
+  python -m venv "$env:USERPROFILE/.venvs/alt"
+  & "$env:USERPROFILE/.venvs/alt/Scripts/python.exe" -m pip install -r requirements.txt
+  ```
+- Network access to api.openalex.org, api.crossref.org and api.unpaywall.org is required. Independent verification uses the *other* AI (Codex checks Claude's results and vice versa) if it is installed and logged in; otherwise ALT records that verification was skipped.
+- Results go into `outputs/` of the folder you opened; the plugin's own files stay in its installation.
+- Personal settings (your e-mail for Crossref/Unpaywall, an optional free [OpenAlex key](https://openalex.org/settings/api)) are kept in `~/.alt/settings.yaml`, never in this repository. ALT asks for the e-mail on first run and for the key only if the shared search limit is hit.
 
-Keep your working folder separate from the plugin installation. Survey results
-go into its `outputs/`; optional presentation templates go into its `templates/`.
-The plugin reads its own default configuration and guides from its installation.
-Python dependencies are set up automatically on the first `/alt:run` (`alt/setup_env.py` creates the external virtual environment and installs `requirements.txt`); only Python itself must already be installed (3.12 tested; 3.10–3.11 untested). To do it by hand instead, in **PowerShell**, from this folder:
-```powershell
-python -m venv "$env:USERPROFILE/.venvs/alt"
-& "$env:USERPROFILE/.venvs/alt/Scripts/python.exe" -m pip install -r requirements.txt
-```
-Keep the virtual environment outside synced folders such as OneDrive.
-
-Personal settings live in `~/.alt/settings.yaml` and are never written into this repository:
-- **E-mail** — sent to Crossref/Unpaywall as the polite-pool contact. The executing AI asks for it on first run.
-- **OpenAlex API key** (optional, free from https://openalex.org/settings/api) — gives you your own daily budget. Copy the key and tell the executing AI; it is read from the clipboard, not pasted into the chat.
-
-### Presentation template (optional)
-Without a template file, slides use a plain 16:9 layout — nothing to set up. To use your own template, put the `.pptx` in your working folder's `templates/`, then in `alt/config.yaml` **copy an existing entry under `output.pptx_templates`** (e.g. `"01"`; every key — `colors`, `content_box`, `slides` … — is required) under a new `<id>`, change `file` (path) and `slides` (which slides are cover / closing / section / body), and set `output.pptx_template` to that `<id>`. Delete the copied `catalog` line unless you also write a slide-type list for your template (a missing list is skipped); with a list, the talk and background decks are rewritten to fit the template's slide types. Template files are not distributed (licence) and are not tracked by git.
+</details>
 
 ## Use
-For development, run `claude --plugin-dir .` from this folder. Installed plugins run from your own working folder — **open the session in the folder where results should be saved** (results go to `outputs/` there). If the session was opened in your home folder, a drive root, or a folder never used for ALT, `/alt:run` stops first and asks whether to use the current folder (`run_status.py --init-workspace`) or reopen in another one. Type:
+**Open the session in the folder where results should be saved** (results go to `outputs/` there). If the session was opened in your home folder, a drive root, or a folder never used for ALT, `/alt:run` stops first and asks whether to use the current folder (`run_status.py --init-workspace`) or reopen in another one. Type:
 ```
 /alt:run
 ```
@@ -106,6 +82,9 @@ There are three functions, chosen in conversation:
 | 3. Feedback on outputs | No new search — revises direction or quality of the outputs, or makes a new kind of output from the papers already found (including PDFs you add) |
 
 Each survey lives in its own folder under `outputs/`. An unfinished survey resumes where it stopped.
+
+### Presentation template (optional)
+Without a template file, slides use a plain 16:9 layout — nothing to set up. To use your own template, put the `.pptx` in your working folder's `templates/`, then in `alt/config.yaml` **copy an existing entry under `output.pptx_templates`** (e.g. `"01"`; every key — `colors`, `content_box`, `slides` … — is required) under a new `<id>`, change `file` (path) and `slides` (which slides are cover / closing / section / body), and set `output.pptx_template` to that `<id>`. Delete the copied `catalog` line unless you also write a slide-type list for your template (a missing list is skipped); with a list, the talk and background decks are rewritten to fit the template's slide types. Template files are not distributed (licence) and are not tracked by git.
 
 ## Utilities
 
