@@ -35,7 +35,8 @@ The policy source for both tools is [`alt/agent_guide.md`](alt/agent_guide.md).
 Private project logs are preserved separately and are not required in a public installation.
 
 ## Requirements
-- [Claude Code](https://claude.com/claude-code) or [OpenAI Codex CLI](https://github.com/openai/codex) (tested: Codex CLI 0.163 plugin install)
+- [Claude Code](https://claude.com/claude-code) (terminal or desktop app) or [OpenAI Codex CLI](https://github.com/openai/codex) (tested: Codex CLI 0.163 plugin install)
+- [Git](https://git-scm.com/download/win) — needed to install from a GitHub repository (Windows: install Git for Windows, open a new terminal, check `git --version`)
 - Python 3.12 (the tested version)
 - Windows is the tested platform (paths in `SKILL.md` assume it). Network access to api.openalex.org, api.crossref.org and api.unpaywall.org.
 - For default independent verification: the other AI CLI must be available and authenticated (Codex verifies Claude results; Claude verifies Codex results). Explicit run-specific exceptions are recorded, not treated as successful verification.
@@ -44,12 +45,19 @@ Private project logs are preserved separately and are not required in a public i
 
 The same repository installs in **Claude Code** and **Codex** (Codex reads the Claude marketplace format).
 
-Claude Code — in the chat:
+**Claude Code — terminal commands (works for the desktop app too).** In PowerShell or any terminal:
+```text
+claude plugin marketplace add Sangyeobk/ALT
+claude plugin install alt@alt-marketplace
+```
+The terminal, the desktop app's local sessions and the VS Code extension on one computer share the same settings, so a plugin installed this way is also available in the desktop app's Code tab ([docs](https://code.claude.com/docs/en/plugins/install.md)). The desktop app has no documented menu for adding a marketplace from a GitHub repository — typing `/plugin …` there does not add it. If `claude` is not found, install the Claude Code command-line tool first ([setup](https://code.claude.com/docs/en/setup)).
+
+Alternatively, inside a terminal `claude` session:
 ```text
 /plugin marketplace add Sangyeobk/ALT
 /plugin install alt@alt-marketplace
 ```
-Then start with `/alt:run`. For a local checkout, launch `claude --plugin-dir .` instead.
+Then start a new session in your working folder and type `/alt:run`. For a local checkout, launch `claude --plugin-dir .` instead.
 
 Codex CLI — in a terminal:
 ```text
