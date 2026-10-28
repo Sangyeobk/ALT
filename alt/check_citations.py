@@ -1,8 +1,8 @@
 """인용 검사: 산출물에 나온 인용 키가 모두 references.json(검증된 문헌)에 있는지 → 하나라도 없으면 실패
 
-    python alt/check_citations.py outputs/<run>/ [--variant 초록]
+    python alt/check_citations.py outputs/<run>/
 
-검사 대상: 그 판의 00_요약, 01_배경학습, 03_보고서, 04_발표, 06_context (파일 끝 _<판>) + 이 조사 맞춤 결과물(project/extras.yaml, cite_check)
+검사 대상: 00_summary, 01_background, 03_report, 04_presentation, 06_context (하나라도 없으면 실패) + 이 조사 맞춤 결과물(project/extras.yaml, cite_check)
 """
 
 import argparse
@@ -45,8 +45,8 @@ def xlsx_text(path: Path) -> str:
 SUFFIX_READERS = {".md": lambda p: p.read_text(encoding="utf-8"), ".txt": lambda p: p.read_text(encoding="utf-8"),
                   ".docx": docx_text, ".pptx": pptx_text, ".xlsx": xlsx_text}  # 조사 맞춤 결과물 (확장자로 고름)
 
-READERS = {"00_요약.md": lambda p: p.read_text(encoding="utf-8"), "06_context.md": lambda p: p.read_text(encoding="utf-8"),
-           "03_보고서.docx": docx_text, "01_배경학습.pptx": pptx_text, "04_발표.pptx": pptx_text}
+READERS = {"00_summary.md": lambda p: p.read_text(encoding="utf-8"), "06_context.md": lambda p: p.read_text(encoding="utf-8"),
+           "03_report.docx": docx_text, "01_background.pptx": pptx_text, "04_presentation.pptx": pptx_text}
 
 
 def output_texts(run_dir: Path, variant: str) -> tuple[dict[str, str], list[str]]:
@@ -62,6 +62,11 @@ def output_texts(run_dir: Path, variant: str) -> tuple[dict[str, str], list[str]
             except Exception:  # noqa: BLE001 — 잠김·손상 모두 '확인 못 함'으로 보고
                 unreadable.append(name)
     return texts, unreadable
+
+
+def missing_outputs(run_dir: Path, variant: str) -> list[str]:
+    """⑨에서 늘 만드는 기본 산출물 중 없는 것 — 검사 대상이 없는데 통과로 쓰지 않게 (Codex 검토 2026-10-28)."""
+    return [name for name in (variant_name(base, variant) for base in READERS) if not (run_dir / name).is_file()]
 
 
 def cited_keys(text: str) -> set[str]:
@@ -89,13 +94,16 @@ def main() -> None:
         all_cited |= keys
         report[name] = {"cited": len(keys), "unknown": sorted(keys - allowed)}
     unknown = sorted({k for r in report.values() for k in r["unknown"]})
-    result = {"files": report, "unreadable": unreadable, "unknown_keys": unknown,
-              "never_cited": sorted(allowed - all_cited), "passed": not unknown and not unreadable}
+    missing = missing_outputs(args.run_dir, args.variant)
+    result = {"files": report, "unreadable": unreadable, "missing": missing, "unknown_keys": unknown,
+              "never_cited": sorted(allowed - all_cited), "passed": not unknown and not unreadable and not missing}
     write_json(args.run_dir / variant_name("citation_check.json", args.variant), result)
     for name, r in report.items():
         print(f"[cite] {name}: 인용 키 {r['cited']}개, 목록에 없는 키 {len(r['unknown'])}개 {r['unknown'] or ''}")
     for name in unreadable:
         print(f"[cite] {name}: 읽지 못함 (Word·PowerPoint에서 열려 있으면 닫고 다시 실행) → 확인 못 함")
+    if missing:
+        print(f"[cite] 기본 산출물 없음 {missing} → ⑨를 먼저 끝낼 것 (확인 못 함)")
     print(f"[cite] {'통과' if result['passed'] else '실패'} — 한 번도 인용되지 않은 문헌 {len(result['never_cited'])}편")
     raise SystemExit(0 if result["passed"] else 1)
 

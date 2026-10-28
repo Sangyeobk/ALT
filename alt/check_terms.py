@@ -11,7 +11,7 @@ import argparse
 import re
 from pathlib import Path
 
-from check_citations import output_texts
+from check_citations import missing_outputs, output_texts
 from common import add_variant, load_config, read_json, variant_name, verbatim_strings, write_json
 
 SNIPPET_CHARS = 20
@@ -67,7 +67,8 @@ def main() -> None:
                     + verbatim_strings(args.run_dir))
     texts, unreadable = output_texts(args.run_dir, args.variant)
     phrases = load_config()["output"].get("placeholder_phrases", [])
-    failed, counts, placeholders = bool(unreadable), {}, {}
+    missing = missing_outputs(args.run_dir, args.variant)  # 검사 대상이 없으면 통과가 아님 (Codex 검토 2026-10-28)
+    failed, counts, placeholders = bool(unreadable) or bool(missing), {}, {}
     for name, text in texts.items():
         hits = find_variants(text, terms, proper_names)
         loose = find_placeholders(text, phrases)
@@ -78,10 +79,12 @@ def main() -> None:
             print(f"    '{found}' → '{term}'  …{snippet}…")
         for phrase, snippet in loose[:10]:
             print(f"    자리표시 '{phrase}' → 실제 이름·요지로  …{snippet}…")
+    if missing:
+        print(f"[terms] 기본 산출물 없음 {missing} → ⑨를 먼저 끝낼 것 (확인 못 함)")
     for name in unreadable:
         print(f"[terms] {name}: 읽지 못함 (Word·PowerPoint에서 열려 있으면 닫고 다시 실행) → 확인 못 함")
     write_json(args.run_dir / variant_name("terms_check.json", args.variant),  # 결과 기록 (run_status가 ⑩ 상태로 읽음)
-               {"passed": not failed, "variants": counts, "placeholders": placeholders, "unreadable": unreadable})
+               {"passed": not failed, "variants": counts, "placeholders": placeholders, "unreadable": unreadable, "missing": missing})
     print(f"[terms] {'실패' if failed else '통과'} — 대표 용어 {len(terms)}개")
     raise SystemExit(1 if failed else 0)
 

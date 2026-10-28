@@ -34,13 +34,40 @@ def required_modules(requirements: Path) -> list[str]:
     return names
 
 
+def required_specs(requirements: Path) -> list[str]:
+    """'배포 이름|불러올 이름|최소 버전' — 버전까지 확인 (Codex 검토 2026-10-28: 있기만 하면 ready였음)."""
+    specs = []
+    for line in requirements.read_text(encoding="utf-8").splitlines():
+        line = line.split("#")[0].strip()
+        dist, _, low = line.partition(">=")
+        dist = dist.strip().lower()
+        if dist and dist not in SKIP:
+            specs.append(f"{dist}|{IMPORT_NAMES.get(dist, dist)}|{low.strip()}")
+    return specs
+
+
+# 실제로 불러 보고(깨진 설치도 잡음) 최소 버전과 비교 — 숫자 부분만 비교 (예: 2.32.3 ≥ 2.32)
+CHECK_CODE = """import importlib, importlib.metadata as md, sys
+num = lambda v: tuple(int(x) for x in v.split('.')[:3] if x.isdigit())
+bad = []
+for spec in sys.argv[1:]:
+    dist, mod, low = (spec.split('|') + ['', ''])[:3] if '|' in spec else ('', spec, '')
+    try:
+        importlib.import_module(mod)
+        if low and num(md.version(dist)) < num(low):
+            bad.append(mod)
+    except Exception:
+        bad.append(mod)
+print(' '.join(bad))"""
+
+
 def missing_modules(python: Path, modules: list[str]) -> list[str]:
-    """그 파이썬에서 불러오지 못하는 모듈 (파이썬이 없으면 전부)."""
+    """그 파이썬에서 불러오지 못하거나 버전이 낮은 모듈 (파이썬이 없으면 전부). 항목은 모듈 이름 또는 required_specs 형식."""
+    names = [m.split("|")[1] if "|" in m else m for m in modules]
     if not python.is_file():
-        return modules
-    code = "import importlib.util,sys;print(' '.join(m for m in sys.argv[1:] if importlib.util.find_spec(m) is None))"
-    result = subprocess.run([str(python), "-c", code, *modules], capture_output=True, text=True)
-    return result.stdout.split() if result.returncode == 0 else modules
+        return names
+    result = subprocess.run([str(python), "-c", CHECK_CODE, *modules], capture_output=True, text=True)
+    return result.stdout.split() if result.returncode == 0 else names
 
 
 def main() -> None:
@@ -49,7 +76,7 @@ def main() -> None:
     parser.add_argument("--target", type=Path, default=DEFAULT_TARGET, help="가상환경 폴더 (시험용)")
     args = parser.parse_args()
     requirements = ROOT / "requirements.txt"
-    modules = required_modules(requirements)
+    modules = required_specs(requirements)
     python = venv_python(args.target)
     missing = missing_modules(python, modules)
     if not missing:

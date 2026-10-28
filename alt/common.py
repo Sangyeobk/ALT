@@ -423,8 +423,8 @@ def candidate_distribution(records: list[dict], rules: dict, axis: dict) -> dict
             for name, pool in pools.items()}
 
 
-OUTPUT_NAMES = ["00_요약.md", "01_배경학습.pptx", "03_보고서.docx", "04_발표.pptx", "05_참고문헌.xlsx", "06_context.md"]
-# 판마다 따로 만드는 산출물 (02_문헌지도.png는 채점 결과만으로 만들어 판과 무관 — 하나만)
+OUTPUT_NAMES = ["00_summary.md", "01_background.pptx", "03_report.docx", "04_presentation.pptx", "05_references.xlsx", "06_context.md"]
+# 판마다 따로 만드는 산출물 (02_literature_map.png는 채점 결과만으로 만들어 판과 무관 — 하나만)
 
 
 def variant_name(name: str, variant: str) -> str:
@@ -449,7 +449,7 @@ def run_reading_mode(run_dir: Path | None) -> str:
 def add_variant(parser, default: str | None = None) -> None:
     """--variant 인자 (기본: config output.default_variant)."""
     parser.add_argument("--variant", default=default or load_config()["output"]["default_variant"],
-                        help="결과 판 이름 — 파일 끝에 붙음 (예: 초록, 전문활용, 전문활용_전체)")
+                        help="폐지됨(2026-10-19 판 구분 없음) — 넣어도 파일 이름은 그대로. 예전 명령 호환용")
 
 
 def review_info(run_dir: Path, variant: str) -> tuple[str, dict[str, str]]:

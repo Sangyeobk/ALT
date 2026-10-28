@@ -25,16 +25,42 @@ VERIFY_PROMPT = """너는 문헌조사논문(리뷰) 평가를 **독립적으로
 ```"""
 
 
+def review_eval_files(run_dir: Path) -> list[Path]:
+    """평가자별 결과 파일 (입력 파일 제외) — 파일 수 = 실제 평가한 AI 수."""
+    return [f for f in sorted(run_dir.glob("review_eval_*.json")) if f.name != "review_eval_input.json"]
+
+
+def evaluation_problems(evaluations, asked: set[str]) -> list[str]:
+    """평가 파일 하나의 완전성 — 요청한 리뷰 전부·중복 없음·contributes는 참/거짓 (Codex 검토 2026-10-28)."""
+    if not isinstance(evaluations, list):
+        return ["목록 형식 아님"]
+    ids = [e.get("openalex_id") if isinstance(e, dict) else None for e in evaluations]
+    problems = []
+    if missing := asked - set(ids):
+        problems.append(f"빠진 리뷰 {len(missing)}편")
+    if extra := set(ids) - asked:
+        problems.append(f"요청에 없는 id {len(extra)}개")
+    if any(ids.count(i) > 1 for i in set(ids)):
+        problems.append("중복 id")
+    if any(not isinstance(e, dict) or type(e.get("contributes")) is not bool for e in evaluations):
+        problems.append("contributes가 true/false가 아님")
+    return problems
+
+
 def contribution_votes(run_dir: Path) -> dict[str, bool] | None:
-    """review_eval_*.json 전부 → {리뷰 id: 모든 평가자가 기여로 봤는가}. 평가 파일이 없으면 None (기존 방식)."""
-    files = sorted(run_dir.glob("review_eval_*.json"))
-    files = [f for f in files if f.name != "review_eval_input.json"]
+    """review_eval_*.json 전부 → {리뷰 id: 모든 평가자가 기여로 봤는가}. 평가 파일이 없으면 None (기존 방식).
+    불완전한 평가 파일이 있으면 멈춤 — 반쪽 평가로 '두 AI 모두 기여'를 만들지 않게 (Codex 검토 2026-10-28)."""
+    files = review_eval_files(run_dir)
     if not files:
         return None
+    asked = {p["openalex_id"] for p in read_json(run_dir / "review_eval_input.json")["papers"]}
     votes: dict[str, list[bool]] = {}
     for f in files:
-        for e in read_json(f):
-            votes.setdefault(e["openalex_id"], []).append(bool(e["contributes"]))
+        evaluations = read_json(f)
+        if problems := evaluation_problems(evaluations, asked):
+            raise SystemExit(f"[review] {f.name} 불완전 ({'; '.join(problems)}) — 그 평가를 다시 한 뒤 점수화")
+        for e in evaluations:
+            votes.setdefault(e["openalex_id"], []).append(e["contributes"])
     return {k: all(v) and len(v) == len(files) for k, v in votes.items()}
 
 
@@ -56,6 +82,9 @@ def verify(run_dir: Path, verifier: str) -> int:
     parsed =last_json_block(report.read_text(encoding="utf-8")) if report.is_file() else None
     if result.returncode != 0 or not parsed:
         raise SystemExit(f"[review] 평가자 실행·응답 실패 (code {result.returncode}) → {report} 확인")
+    asked = {p["openalex_id"] for p in read_json(run_dir / "review_eval_input.json")["papers"]}
+    if problems := evaluation_problems(parsed.get("evaluations"), asked):  # 저장 전에 검사 — 불완전하면 평가 미완료
+        raise SystemExit(f"[review] 평가 응답 불완전 ({'; '.join(problems)}) — 저장하지 않음, 다시 실행 → {report}")
     write_json(run_dir / f"review_eval_{verifier}.json", parsed["evaluations"])
     return sum(e["contributes"] for e in parsed["evaluations"])
 
@@ -70,6 +99,10 @@ def main() -> None:
         print(f"[review] 평가 대상 리뷰 {prepare(args.run_dir)}편 -> review_eval_input.json")
     if args.verifier:
         print(f"[review] {args.verifier} 평가: 기여 {verify(args.run_dir, args.verifier)}편 -> review_eval_{args.verifier}.json")
+    if args.prepare and not args.verifier:  # 입력만 새로 만듦 — 이전 평가 파일은 새 후보와 안 맞을 수 있어 검사하지 않음 (평가 뒤 점수화 때 검사)
+        if review_eval_files(args.run_dir):
+            print("[review] 후보가 바뀌었으면 두 평가(review_eval_<AI>.json)를 모두 다시 해야 점수화가 됨")
+        return
     votes = contribution_votes(args.run_dir)
     if votes is not None:
         print(f"[review] 모든 평가자가 기여로 본 리뷰 {sum(votes.values())}편 / 평가 {len(votes)}편")

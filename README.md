@@ -1,18 +1,19 @@
 # ALT — Agentic Literature Tracker
 
-A literature-survey workflow shared by Claude Code and Codex/GPT, with a Claude Code plugin adapter. Give it a **topic, an approach and a period**; it searches the scholarly databases, scores and selects papers, and writes:
+A literature-survey plugin for Claude Code and Codex (one repository, installs in both). Give it a **topic, an approach and a period**; it searches the scholarly databases, scores and selects papers, and writes:
 
 | File | What it is |
 |---|---|
-| `00_요약.md` | Summary of the survey |
-| `01_배경학습.pptx` | Background slides on the topic |
-| `03_보고서.docx` | Survey report (Word) |
-| `04_발표.pptx` | Survey presentation |
-| `05_참고문헌.xlsx` | Scored reference list (all candidates, with reasons) |
+| `00_summary.md` | Summary of the survey |
+| `01_background.pptx` | Background slides on the topic |
+| `02_literature_map.png` | Literature map (candidates by axis, selected papers highlighted) |
+| `03_report.docx` | Survey report (Word) |
+| `04_presentation.pptx` | Survey presentation |
+| `05_references.xlsx` | Scored reference list (all candidates, with reasons) |
 | `06_context.md` | Condensed context for coding / follow-up work |
 | `figures/` | Literature map, selection flow, technology tree, paper-count charts |
 
-Output text is Korean by default (the language can be chosen per survey). Code comments and the AI instructions (`SKILL.md`, guides) are in Korean.
+Output text is Korean. Other output languages are not supported yet: the fixed text the code adds (section titles, table headers, method notes, Excel column names, figure labels) is Korean only. Code comments and the AI instructions (`SKILL.md`, guides) are in Korean.
 
 ## How it works
 1. **Define the topic** — The executing AI proposes a precise scope (included/excluded, research question, map axis) and asks you to confirm.
@@ -34,25 +35,33 @@ The policy source for both tools is [`alt/agent_guide.md`](alt/agent_guide.md).
 Private project logs are preserved separately and are not required in a public installation.
 
 ## Requirements
-- [Claude Code](https://claude.com/claude-code) for the plugin, or [OpenAI Codex CLI](https://github.com/openai/codex) for direct execution of the shared procedure
+- [Claude Code](https://claude.com/claude-code) or [OpenAI Codex CLI](https://github.com/openai/codex) (tested: Codex CLI 0.163 plugin install)
 - Python 3.12 (the tested version)
 - Windows is the tested platform (paths in `SKILL.md` assume it). Network access to api.openalex.org, api.crossref.org and api.unpaywall.org.
 - For default independent verification: the other AI CLI must be available and authenticated (Codex verifies Claude results; Claude verifies Codex results). Explicit run-specific exceptions are recorded, not treated as successful verification.
 
 ## Install
 
-For a local checkout, launch `claude --plugin-dir .` and use `/alt:run`.
-After the repository is published, marketplace installation is:
+The same repository installs in **Claude Code** and **Codex** (Codex reads the Claude marketplace format).
 
+Claude Code — in the chat:
 ```text
 /plugin marketplace add Sangyeobk/ALT
 /plugin install alt@alt-marketplace
 ```
+Then start with `/alt:run`. For a local checkout, launch `claude --plugin-dir .` instead.
+
+Codex CLI — in a terminal:
+```text
+codex plugin marketplace add Sangyeobk/ALT
+codex plugin add alt@alt-marketplace
+```
+Then start a Codex session in your working folder and type `$alt:run`.
 
 Keep your working folder separate from the plugin installation. Survey results
 go into its `outputs/`; optional presentation templates go into its `templates/`.
 The plugin reads its own default configuration and guides from its installation.
-Python dependencies are set up automatically on the first `/alt:run` (`alt/setup_env.py` creates the external virtual environment and installs `requirements.txt`); only Python 3.10+ itself must already be installed. To do it by hand instead, in **PowerShell**, from this folder:
+Python dependencies are set up automatically on the first `/alt:run` (`alt/setup_env.py` creates the external virtual environment and installs `requirements.txt`); only Python itself must already be installed (3.12 tested; 3.10–3.11 untested). To do it by hand instead, in **PowerShell**, from this folder:
 ```powershell
 python -m venv "$env:USERPROFILE/.venvs/alt"
 & "$env:USERPROFILE/.venvs/alt/Scripts/python.exe" -m pip install -r requirements.txt
@@ -64,7 +73,7 @@ Personal settings live in `~/.alt/settings.yaml` and are never written into this
 - **OpenAlex API key** (optional, free from https://openalex.org/settings/api) — gives you your own daily budget. Copy the key and tell the executing AI; it is read from the clipboard, not pasted into the chat.
 
 ### Presentation template (optional)
-Slides are built on `templates/pptx_template.pptx` if it exists (path set in `alt/config.yaml`, `output.pptx_template`). The file must contain a cover slide first, any example slides, and a closing slide last; layout 1 should be a blank layout. Without it, a plain 16:9 layout is used. The `templates/` folder is not tracked by git.
+Without a template file, slides use a plain 16:9 layout — nothing to set up. To use your own template, put the `.pptx` in your working folder's `templates/`, then in `alt/config.yaml` **copy an existing entry under `output.pptx_templates`** (e.g. `"01"`; every key — `colors`, `content_box`, `slides` … — is required) under a new `<id>`, change `file` (path) and `slides` (which slides are cover / closing / section / body), and set `output.pptx_template` to that `<id>`. Delete the copied `catalog` line unless you also write a slide-type list for your template (a missing list is skipped); with a list, the talk and background decks are rewritten to fit the template's slide types. Template files are not distributed (licence) and are not tracked by git.
 
 ## Use
 For development, run `claude --plugin-dir .` from this folder. Installed plugins run from your own working folder — **open the session in the folder where results should be saved** (results go to `outputs/` there). If the session was opened in your home folder, a drive root, or a folder never used for ALT, `/alt:run` stops first and asks whether to use the current folder (`run_status.py --init-workspace`) or reopen in another one. Type:
@@ -76,7 +85,7 @@ The executing AI asks for the topic, approach and period — no manual needed. A
 /alt:run Wave loads on offshore structures, data-driven, 2025-2027
 ```
 
-With Codex/GPT, open the checkout, read `AGENTS.md`, and request the same survey in conversation. `/alt:run` and `alt:alt-*` are Claude plugin registrations, not requirements for direct execution. Follow the shared adapter instructions for script paths, role guides, verifier selection and usage reporting. Use the same survey folder and file contracts.
+With Codex, install the plugin as above and type `$alt:run` (or, without installing, open a checkout, read `AGENTS.md` and request the survey in conversation). The role agents `alt:alt-*` are Claude Code registrations; Codex runs the same role guides directly. Follow the shared adapter instructions for script paths, role guides, verifier selection and usage reporting. Use the same survey folder and file contracts.
 
 There are three functions, chosen in conversation:
 
@@ -116,6 +125,8 @@ python alt/package_plugin.py --out outputs/alt-plugin.zip
 & "$env:USERPROFILE/.venvs/alt/Scripts/python.exe" -m pytest -q tests
 ```
 
+Run from the plugin folder. Tests that need a presentation template are skipped when `templates/` has none.
+
 ## Layout
 | Path | Contents |
 |---|---|
@@ -124,8 +135,6 @@ python alt/package_plugin.py --out outputs/alt-plugin.zip
 | `agents/` | Shared scoring, reading and writing roles with Claude plugin registration headers |
 | `alt/` | Python scripts, `config.yaml` (weights, thresholds, field names), guides and rubrics |
 | `tests/` | pytest tests |
-| `sample_inputs/` | Example survey request |
 
-## Credits and licence
+## Licence
 - This project: MIT License, see `LICENSE`.
-- `.claude/skills/_vendor/`: parts of K-Dense-AI scientific-agent-skills (MIT, see `LICENSE_K-Dense_MIT.md`).

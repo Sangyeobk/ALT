@@ -1,4 +1,4 @@
-"""마크다운 산출물 → 00_요약.md (한 쪽 요약), 06_context.md (코딩용 배경)
+"""마크다운 산출물 → 00_summary.md (한 쪽 요약), 06_context.md (코딩용 배경)
 
     python alt/write_markdown.py outputs/<run>/
 """
@@ -21,7 +21,7 @@ def summary_md(s: dict, meta: dict, references: dict, review_line: str, run_dir:
     lines = [f"# {report_title(run_dir, s, references)}", "",
              f"> 검색일 {meta['run_at'][:10]} · 후보 {p['screened']}편 → 핵심논문 **{p['selected']}편** + 문헌조사논문 {p['reviews_listed']}편 별도 "
              f"(관련성 {meta['min_relevance']}점 이상, 기준 점수 {meta['min_total_score']}, 교차 검증 반영). "
-             "괄호 [ ] 안은 근거 논문 인용 키 — `05_참고문헌.xlsx`에서 찾을 수 있음", "", f"> {review_line}", "",
+             "괄호 [ ] 안은 근거 논문 인용 키 — `05_references.xlsx`에서 찾을 수 있음", "", f"> {review_line}", "",
              "## 조사 목적과 범위", *([f"- {asked}"] if asked else []), *[f"- {label}: {text}" for label, text in scope_history(run_dir)], f"- 연구 문제: {sc['question']}",
              *(["- 핵심 키워드 (결론까지 따라가는 판단 기준):", *[f"  - **{k['term']}**: {k['plain']} — {k['question']}" for k in kw]] if kw else []),
              f"- 흐름: {' → '.join(sc['flow'])}",
@@ -52,7 +52,7 @@ def context_md(s: dict, references: dict, review_line: str, level_of: dict) -> s
     c = s["context"]
     lines = ["# 코딩용 배경 자료 (context.md)", "",
              "> 사용법: 이 파일을 새 프로젝트 폴더에 두고 Claude Code에 \"이 context.md를 배경으로 ○○를 만들어 줘\"라고 요청.",
-             "> 근거 표시 [키]는 `05_참고문헌.xlsx`·`05_참고문헌.bib`의 인용 키, [일반 개념]은 교과서 수준 지식.",
+             "> 근거 표시 [키]는 `05_references.xlsx`·`05_references.bib`의 인용 키, [일반 개념]은 교과서 수준 지식.",
              f"> 수식·기법은 원문 확인 후 쓸 것. {review_line}", "",
              "## 문제 정의", c["problem_statement"], "",
              "## 지배 방정식·기본 관계", *[f"- **{e['name']}**: `{e['equation']}` — {e['meaning']} [{e['source']}]"
@@ -86,7 +86,7 @@ def main() -> None:
     meta = read_json(args.run_dir / "scored.json")["meta"]
     references = read_json(args.run_dir / "references.json")
     review_line, level_of = review_info(args.run_dir, args.variant)
-    summary, context = variant_name("00_요약.md", args.variant), variant_name("06_context.md", args.variant)
+    summary, context = variant_name("00_summary.md", args.variant), variant_name("06_context.md", args.variant)
     (args.run_dir / summary).write_text(summary_md(synthesis, meta, references, review_line, args.run_dir), encoding="utf-8")
     (args.run_dir / context).write_text(context_md(synthesis, references, review_line, level_of), encoding="utf-8")
     print(f"[markdown] {summary}, {context}")

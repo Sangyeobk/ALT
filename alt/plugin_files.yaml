@@ -2,23 +2,6 @@
 files:
   - .claude-plugin/marketplace.json
   - .claude-plugin/plugin.json
-  - .claude/skills/_vendor/LICENSE_K-Dense_MIT.md
-  - .claude/skills/_vendor/literature-review/SKILL.md
-  - .claude/skills/_vendor/literature-review/assets/review_template.md
-  - .claude/skills/_vendor/literature-review/references/citation_styles.md
-  - .claude/skills/_vendor/literature-review/references/core_workflow.md
-  - .claude/skills/_vendor/literature-review/references/database_strategies.md
-  - .claude/skills/_vendor/literature-review/references/search_and_citation.md
-  - .claude/skills/_vendor/literature-review/scripts/verify_citations.py
-  - .claude/skills/_vendor/paper-lookup/SKILL.md
-  - .claude/skills/_vendor/paper-lookup/references/crossref.md
-  - .claude/skills/_vendor/paper-lookup/references/doaj.md
-  - .claude/skills/_vendor/paper-lookup/references/openalex.md
-  - .claude/skills/_vendor/paper-lookup/references/opencitations.md
-  - .claude/skills/_vendor/paper-lookup/references/unpaywall.md
-  - .claude/skills/_vendor/paper-lookup/scripts/_common.py
-  - .claude/skills/_vendor/paper-lookup/scripts/openalex_abstract.py
-  - .claude/skills/_vendor/paper-lookup/scripts/paginate.py
   - AGENTS.md
   - LICENSE
   - README.md
@@ -54,7 +37,6 @@ files:
   - alt/merge_runs.py
   - alt/package_plugin.py
   - alt/plugin_files.yaml
-  - alt/pptx_catalog.py
   - alt/prepare_relevance_batches.py
   - alt/prepare_slides.py
   - alt/prepare_synthesis.py
@@ -74,11 +56,43 @@ files:
   - alt/setup_env.py
   - alt/slides_guide.md
   - alt/slides_plan.py
-  - alt/swap_terms.py
   - alt/synthesis_guide.md
   - alt/usage_log.py
   - alt/verify_prompt.md
   - alt/write_markdown.py
   - requirements.txt
-  - sample_inputs/survey_request.yaml
   - skills/run/SKILL.md
+  - tests/test_build_docx.py
+  - tests/test_check_integrity.py
+  - tests/test_check_terms.py
+  - tests/test_cocited.py
+  - tests/test_cross_verify.py
+  - tests/test_extract_figures.py
+  - tests/test_extract_fulltext.py
+  - tests/test_feedback_1019.py
+  - tests/test_fetch_open_access.py
+  - tests/test_institution_docs.py
+  - tests/test_library_replace.py
+  - tests/test_make_figures.py
+  - tests/test_merge_runs.py
+  - tests/test_package_plugin.py
+  - tests/test_plugin_workspace.py
+  - tests/test_pptx_fit.py
+  - tests/test_preferences.py
+  - tests/test_prepare_synthesis.py
+  - tests/test_project_layer.py
+  - tests/test_refresh_check.py
+  - tests/test_relevance_batches.py
+  - tests/test_report_facts.py
+  - tests/test_review_contribution.py
+  - tests/test_revise_synthesis.py
+  - tests/test_run_extras.py
+  - tests/test_run_status.py
+  - tests/test_score_papers.py
+  - tests/test_search_papers.py
+  - tests/test_settings_keys.py
+  - tests/test_setup_env.py
+  - tests/test_slides_plan.py
+  - tests/test_topic.py
+  - tests/test_usage_log.py
+  - tests/test_variant.py

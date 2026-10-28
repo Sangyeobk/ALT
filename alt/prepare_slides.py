@@ -2,7 +2,7 @@
 
     python alt/prepare_slides.py outputs/<run>/                 # slides_input.json (alt-writer가 alt/slides_guide.md대로 slides.json을 씀)
     python alt/prepare_slides.py outputs/<run>/ --check         # slides.json 검사 (글자 수 한도·칸·그림·표·인용 키)
-    python alt/prepare_slides.py outputs/<run>/ --deck learn    # 01_배경학습: slides_learn_input.json → slides_learn.json (--check도 같음)
+    python alt/prepare_slides.py outputs/<run>/ --deck learn    # 01_background: slides_learn_input.json → slides_learn.json (--check도 같음)
 
 양식에 장 종류 목록(config output.pptx_templates.<양식>.catalog)이 있을 때만 쓴다. 없으면 build_pptx.py가 예전 방식으로 만든다.
 """
@@ -54,7 +54,7 @@ def build_input(run_dir: Path, style: dict, catalog: dict) -> dict:
 
 
 def build_learn_input(run_dir: Path, style: dict, catalog: dict) -> dict:
-    """01_배경학습 구성안 입력 — 요약 전체 대신 배경 부분만 (용어 표·읽는 법은 코드가 붙이므로 뺌)."""
+    """01_background 구성안 입력 — 요약 전체 대신 배경 부분만 (용어 표·읽는 법은 코드가 붙이므로 뺌)."""
     s = read_json(run_dir / "synthesis.json")
     refs = read_json(run_dir / "references.json")
     meta = read_json(run_dir / "scored.json")["meta"]

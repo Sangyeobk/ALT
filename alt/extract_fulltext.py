@@ -118,6 +118,21 @@ def make_batches(sizes: dict[str, int], per_batch: int) -> list[list[str]]:
     return batches
 
 
+def ensure_txt(pdf: Path, rules: dict, force: bool) -> tuple[int | None, float | None]:
+    """PDF → 같은 이름 .txt (참고문헌 자르기·서론 줄이기). (글자 수, 줄인 비율) — 글이 너무 적으면 (None, None).
+    이미 PDF보다 새 .txt가 있으면 그대로 쓴다."""
+    txt = pdf.with_suffix(".txt")
+    trimmed = None
+    if force or not (txt.is_file() and txt.stat().st_mtime >= pdf.stat().st_mtime):
+        text = cut_references(pdf_text(pdf), rules["references_headings"])
+        if len(text) < rules["min_text_chars"]:
+            txt.unlink(missing_ok=True)
+            return None, None
+        text, trimmed = trim_sections(text, rules["trim_section_words"], rules["max_trim_ratio"])
+        txt.write_text(text, encoding="utf-8")
+    return len(txt.read_text(encoding="utf-8")), trimmed
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("run_dir", type=Path)
@@ -139,22 +154,23 @@ def main() -> None:
         print(f"[fulltext] 레퍼런스 폴더의 맥락 정리 {len(reused)}편 가져옴 (같은 PDF — 다시 읽지 않음): "
               + ", ".join(f"{k}←{src}" for k, (_, src) in reused.items()))
         done |= set(reused)
+    for key in (k for k in targets if k in done):  # 정리가 이미 있어도(가져온 것 포함) 검증(쪽 번호·수치 대조)용 본문 .txt는 있게 (Codex 검토 2026-10-28)
+        pdf = args.run_dir / (references[key].get("pdf_file") or f"papers/{key}.pdf")
+        if pdf.is_file():
+            ensure_txt(pdf, rules, args.force)
     skipped = [k for k in targets if k in done]
     readable, trimmed, unreadable = {}, {}, []
     for key in (k for k in targets if k not in done):
         pdf = args.run_dir / (references[key].get("pdf_file") or f"papers/{key}.pdf")
         if not pdf.is_file():
             continue
-        txt = pdf.with_suffix(".txt")
-        if args.force or not (txt.is_file() and txt.stat().st_mtime >= pdf.stat().st_mtime):
-            text = cut_references(pdf_text(pdf), rules["references_headings"])
-            if len(text) < rules["min_text_chars"]:
-                txt.unlink(missing_ok=True)
-                unreadable.append(key)
-                continue
-            text, trimmed[key] = trim_sections(text, rules["trim_section_words"], rules["max_trim_ratio"])
-            txt.write_text(text, encoding="utf-8")
-        readable[key] = len(txt.read_text(encoding="utf-8"))
+        length, trim = ensure_txt(pdf, rules, args.force)
+        if length is None:
+            unreadable.append(key)
+            continue
+        if trim is not None:
+            trimmed[key] = trim
+        readable[key] = length
 
     first = next_batch_number(args.run_dir)
     batches = {str(first + i): keys for i, keys in enumerate(make_batches(readable, rules["papers_per_batch"]) if readable else [])}

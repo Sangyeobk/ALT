@@ -1,4 +1,4 @@
-"""문헌조사 보고서 → 03_보고서.docx (모든 인용은 참고문헌 키와 연결)
+"""문헌조사 보고서 → 03_report.docx (모든 인용은 참고문헌 키와 연결)
 
     python alt/build_docx.py outputs/<run>/
 장 구성·순서: alt/report_guide.md, config output.report_sections (개인 설정이 우선).
@@ -325,7 +325,7 @@ def sec_landscape(rpt, c):
                   [4.2, 1.8, 1.2, 9.3], size=9)
     floor = c.config["output"]["map_min_relevance"]
     pool = sum(r["relevance"] >= floor and not r["exclude"] for r in c.records)
-    rpt.figure(c.run_dir / "02_문헌지도.png", f"그림 {c.fig()}. 문헌지도 — 관련성 {floor}점 이상 후보 {pool}편 (남색 핵심논문, ◆ 문헌조사논문, 회색 기타). "
+    rpt.figure(c.run_dir / "02_literature_map.png", f"그림 {c.fig()}. 문헌지도 — 관련성 {floor}점 이상 후보 {pool}편 (남색 핵심논문, ◆ 문헌조사논문, 회색 기타). "
                "원 크기는 조사 우선순위 점수이며 품질 판정이 아님")
     dist_png = c.run_dir / "figures" / "distribution.png"
     if dist_png.is_file():  # 논문 수 분포 — 대륙·축·접근법 (사용자 피드백 2026-10-19)
@@ -505,7 +505,7 @@ SECTIONS = {  # id → (제목, 함수, 종류: main = 번호 / appendix = 부�
     # 예전 장 id (개인 설정에서 다시 켤 수 있음)
     "purpose": ("조사 목적과 범위", sec_purpose, "main"),
     "method": ("검색·선정 방법과 한계", sec_method, "main"),
-    "appendix_excel": ("상세 자료 안내 (05_참고문헌.xlsx)", sec_appendix_excel, "appendix"),
+    "appendix_excel": ("상세 자료 안내 (05_references.xlsx)", sec_appendix_excel, "appendix"),
     "appendix_methods": ("핵심논문 비교표", sec_appendix_methods, "appendix"),
     "appendix_excluded": ("선정 밖 문헌 점검표", sec_appendix_excluded, "appendix"),
     "appendix_counts": ("집계 근거표 — 본문 편수의 출처", sec_appendix_counts, "appendix"),
@@ -550,7 +550,7 @@ def build(run_dir: Path, variant: str) -> Path:
     rpt.para(f"대상 출판 {years[0]}–{years[-1]} · 검색일 {c.meta['run_at'][:10]} · 후보 {p['screened']}편 → 핵심논문 {p['selected']}편 "
              f"+ 문헌조사논문 {p['reviews_listed']}편", 10, False, None, WD_ALIGN_PARAGRAPH.CENTER)
     rpt.para(c.review_line, 10, True, RED, WD_ALIGN_PARAGRAPH.CENTER)
-    rpt.para("[ ] 안은 근거 문헌의 인용 키 (참고문헌·05_참고문헌.xlsx와 같음), [일반 개념]은 교과서 수준 지식",
+    rpt.para("[ ] 안은 근거 문헌의 인용 키 (참고문헌·05_references.xlsx와 같음), [일반 개념]은 교과서 수준 지식",
              9, False, None, WD_ALIGN_PARAGRAPH.CENTER)
 
     appendix = 0
@@ -567,7 +567,7 @@ def build(run_dir: Path, variant: str) -> Path:
         rpt.lead((s.get("leads") or {}).get(sid, ""))
         fn(rpt, c)
 
-    out = run_dir / c.vname("03_보고서.docx")
+    out = run_dir / c.vname("03_report.docx")
     rpt.doc.save(out)
     return out
 

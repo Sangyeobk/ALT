@@ -95,11 +95,13 @@ def save(run_dir: Path, step: str, name: str, usage: dict, estimate: int | None 
 
 
 def summary(run_dir: Path) -> list[dict]:
-    """단계별 합계 (기록 순서 유지). total = 입력 + 캐시 쓰기 + 캐시 읽기 + 출력 (누적 처리량)."""
-    rows: dict[str, dict] = {}
+    """단계·서비스별 합계 (기록 순서 유지). total = 입력 + 캐시 쓰기 + 캐시 읽기 + 출력 (누적 처리량).
+    다른 서비스(Codex 등) 기록은 '단계 (codex)' 행으로 따로 — 한도가 달라 합치지 않음 (Codex 검토 2026-10-28)."""
+    rows: dict[tuple, dict] = {}
     for path in sorted((Path(run_dir) / "usage").glob("*.json"), key=lambda p: p.stat().st_mtime):
         record = read_json(path)
-        row = rows.setdefault(record["step"], {"step": record["step"], "runs": 0, "estimate": 0, **dict.fromkeys(FIELDS, 0)})
+        source = record.get("source") or "claude"
+        row = rows.setdefault((record["step"], source), {"step": record["step"], "source": source, "runs": 0, "estimate": 0, **dict.fromkeys(FIELDS, 0)})
         row["runs"] += 1
         row["estimate"] += record.get("estimate") or 0
         for field in FIELDS:
@@ -156,7 +158,7 @@ def budget(units: dict[str, int], reference: dict, ratio: float | None) -> list[
     return rows
 
 
-def print_budget(rows: list[dict], used: float, ratio: float | None) -> None:
+def print_budget(rows: list[dict], used: float | None, ratio: float | None, unknown: list[str] | None = None) -> None:
     print("| 단계 | 단위 수 | 추정 처리량 | 5시간 한도 대비 |")
     print("|---|---|---|---|")
     for r in rows:
@@ -168,11 +170,16 @@ def print_budget(rows: list[dict], used: float, ratio: float | None) -> None:
         print("\n% 환산 불가 — 보정 기록 없음 (큰 단계 전후 사용률로 calibrate를 남기면 다음부터 표시). 처리량만 참고")
     elif known:
         total = sum(r["pct"] for r in known)
-        print(f"\n합계 약 {total:.1f}% — 지금 {used:g}% 사용 → 실행 뒤 약 {used + total:.0f}% (추정, 주 세션 포함 실측 보정)")
-        if used + total > 100:
-            print("주의: 5시간 한도를 넘음 — 범위를 줄이거나 한도 초기화 뒤 나눠 실행")
+        if used is None:  # 사용률을 읽을 도구가 없음 — 0으로 가정하지 않음 (Codex 검토 2026-10-28)
+            print(f"\n합계 약 {total:.1f}% (추정) — 지금 사용률은 확인 못 함")
+        else:
+            print(f"\n합계 약 {total:.1f}% — 지금 {used:g}% 사용 → 실행 뒤 약 {used + total:.0f}% (추정, 주 세션 포함 실측 보정)")
+            if used + total > 100:
+                print("주의: 5시간 한도를 넘음 — 범위를 줄이거나 한도 초기화 뒤 나눠 실행")
     if any(r["tokens"] is None for r in rows):
         print("'실측 없음' 단계는 합계에 빠짐 — 실행 뒤 장부(show)로 기준값을 채움")
+    if unknown:  # 편수를 아직 모르는 단계 — '전체'에서 조용히 빠지지 않게 (Codex 검토 2026-10-28)
+        print(f"아직 편수를 모르는 단계(표·합계에 없음): {', '.join(unknown)}")
 
 
 def main() -> None:
@@ -196,7 +203,7 @@ def main() -> None:
     calib.add_argument("--after", type=float, required=True, help="단계 뒤 5시간 사용률 %%")
     calib.add_argument("--tokens", type=int, help="처리량 (없으면 장부의 그 단계 합계)")
     plan = sub.add_parser("budget", help="단계별 예상 처리량과 5시간 한도 대비 %%")
-    plan.add_argument("--used-5h", type=float, required=True, help="지금 5시간 사용률 %% (앱 get_usage)")
+    plan.add_argument("--used-5h", type=float, help="지금 5시간 사용률 %% (앱 get_usage) — 확인할 수 없으면 빼고 처리량·%% 합계만")
     plan.add_argument("--papers", type=int, default=0, help="관련성 채점할 후보 수")
     plan.add_argument("--fulltext", type=int, default=0, help="본문 정리할 논문 수")
     plan.add_argument("--no-run-steps", action="store_true", help="결과 1벌 단위 단계(요약 등) 빼기")
@@ -204,7 +211,8 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.command == "calibrate":
-        tokens = args.tokens or next((r["total"] for r in summary(args.run_dir) if r["step"] == args.step), 0)
+        tokens = args.tokens or next((r["total"] for r in summary(args.run_dir)
+                                      if r["step"] == args.step and r["source"] == "claude"), 0)  # 이 서비스(Claude) 기록만
         if not tokens:
             raise SystemExit(f"[usage] 장부에 '{args.step}' 기록 없음 — --tokens로 직접 주기")
         model = step_model(args.run_dir, args.step)
@@ -214,7 +222,9 @@ def main() -> None:
     if args.command == "budget":
         ratio = pct_per_token(calibration_path(), args.model)
         units = {"paper": args.papers, "fulltext": args.fulltext, "run": 0 if args.no_run_steps else 1}
-        print_budget(budget(units, load_config()["usage"]["reference_tokens"], ratio), args.used_5h, ratio)
+        reference = load_config()["usage"]["reference_tokens"]
+        unknown = [step for step, ref in reference.items() if not units.get(ref["per"]) and ref["per"] != "run"]
+        print_budget(budget(units, reference, ratio), args.used_5h, ratio, unknown)
         return
 
     if args.command in ("add", "add-session"):
@@ -232,7 +242,8 @@ def main() -> None:
     print("| 단계 | 실행 | 호출 | 입력 | 캐시 쓰기 | 캐시 읽기 | 출력(참고) | 누적 처리량 | 추정 |")
     print("|---|---|---|---|---|---|---|---|---|")
     for r in rows:
-        print(f"| {r['step']} | {r['runs']} | {r['calls']} | {r['input']:,} | {r['cache_write']:,} | {r['cache_read']:,} | "
+        service = "" if r["source"] == "claude" else f" ({r['source']})"  # 다른 서비스는 따로 표시 (3.10 호환 — 같은 따옴표 중첩 안 씀)
+        print(f"| {r['step']}{service} | {r['runs']} | {r['calls']} | {r['input']:,} | {r['cache_write']:,} | {r['cache_read']:,} | "
               f"{r['output']:,} | {r['total']:,} | {r['estimate']:,} |")
 
 

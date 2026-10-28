@@ -1,4 +1,4 @@
-"""그림 → figures/ : 문헌지도(02_문헌지도.png), 문헌 선별 흐름도(PRISMA 흐름도 형식 참조), 후보 문헌 분포 행렬(gap_matrix.png),
+"""그림 → figures/ : 문헌지도(02_literature_map.png), 문헌 선별 흐름도(PRISMA 흐름도 형식 참조), 후보 문헌 분포 행렬(gap_matrix.png),
 배경 이론 + 문헌 통계 그림 2종(theory_flow.png, limit_response.png — synthesis.json에 해당 항목이 있을 때만)
 
     python alt/make_figures.py outputs/<run>/
@@ -612,7 +612,7 @@ def main() -> None:
                      if r["relevance"] >= rules["map_min_relevance"] and not r["exclude"])
     if axis["field"] == "text" and unassigned:
         print(f"[figures] 주의: 가로축 '{axis['name']}' AI 분류가 없는 후보 {unassigned}편은 낱말 미리보기로 나눔 — classify_axis.py 먼저")
-    reference_map(scored["records"], references, rules, axis, args.run_dir / "02_문헌지도.png")
+    reference_map(scored["records"], references, rules, axis, args.run_dir / "02_literature_map.png")
     affiliations_path = args.run_dir / "affiliations.json"
     total = distribution(scored["records"], rules, axis, read_json(affiliations_path) if affiliations_path.is_file() else {},
                          fig_dir / "distribution.png")
@@ -620,7 +620,7 @@ def main() -> None:
           else " — 대륙 막대 없음: fetch_affiliations.py 먼저") + ")")
     prisma(scored["meta"], fig_dir / "prisma.png")
     pool = gap_matrix(scored["records"], rules, axis, fig_dir / "gap_matrix.png")
-    print(f"[figures] 02_문헌지도.png, figures/prisma.png, figures/gap_matrix.png (공백 행렬 {pool}편)")
+    print(f"[figures] 02_literature_map.png, figures/prisma.png, figures/gap_matrix.png (공백 행렬 {pool}편)")
 
     synthesis_path = args.run_dir / variant_name("synthesis.json", args.variant)  # 아래 두 그림만 판마다 다름
     s = read_json(synthesis_path) if synthesis_path.is_file() else {}

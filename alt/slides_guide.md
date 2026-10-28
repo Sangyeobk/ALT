@@ -1,6 +1,6 @@
 # 발표 구성안 지침 (⑨-1 — alt-writer, 사용자 결정 2026-10-21)
 
-입력 `slides_input.json` → 출력 `slides.json` 하나 (01_배경학습은 맨 아래 '배경학습' 절). 발표(04_발표.pptx)를 **양식의 장 종류에 맞춰 새로 쓴다** — 보고서 문장을 옮겨 붙이지 않는다.
+입력 `slides_input.json` → 출력 `slides.json` 하나 (01_background은 맨 아래 '배경학습' 절). 발표(04_presentation.pptx)를 **양식의 장 종류에 맞춰 새로 쓴다** — 보고서 문장을 옮겨 붙이지 않는다.
 내용·용어·표현의 기본 규칙은 `alt/report_guide.md`를 따른다 (사실은 요약 `synthesis`에 있는 것만, 숫자를 지어내지 않음, 쉬운 말, 번역투 자제).
 
 ## 입력에 있는 것
@@ -14,7 +14,7 @@
   {"type": "cover", "slots": {"title": ["…"], "subtitle": ["…"]}},
   {"type": "contents", "slots": {"title": ["목차"], "item1": ["장 이름", "한 줄 설명"], "...": []}},
   {"type": "section", "slots": {"title": ["장 이름", "한 줄 설명"]}},
-  {"type": "figure_full", "slots": {"title": ["…"]}, "image": "02_문헌지도.png"},
+  {"type": "figure_full", "slots": {"title": ["…"]}, "image": "02_literature_map.png"},
   {"type": "table", "slots": {"title": ["…"]}, "table": {"header": ["…"], "rows": [["…"]]}}
 ]}
 ```
@@ -45,16 +45,16 @@
 ## 끝 확인
 `python alt/prepare_slides.py <run>/ --check`가 통과할 때까지 고친다 (한도 초과·칸 개수·없는 그림·없는 인용 키를 알려 줌). 통과하면 장 수와 종류별 개수를 짧게 보고한다.
 
-## 배경학습 (01_배경학습.pptx — 입력에 `"deck": "learn"`, 사용자 결정 2026-10-21)
+## 배경학습 (01_background.pptx — 입력에 `"deck": "learn"`, 사용자 결정 2026-10-21)
 입력 `slides_learn_input.json` → 출력 `slides_learn.json`. 문헌조사 결과가 아니라 **결과물을 쉽게 읽기 위한 배경 설명** — 처음 공부하는 사람에게 설명하듯 쓴다. 출력 형식·글자 수 한도·인용·약어·기술 핵심어 규칙(위 '출력 형식', '구성 규칙' 4–7)은 같다.
 - 입력: `background`(목적·큰 그림·개념·접근법 비교·기본 단계, `leads` = 장 요지), `subtopics`(분야 이름·역할·요지)·`role_names`·`approach_roles`, `reviews_guide`(참고할 문헌조사논문), `names`(주제·접근법 이름), `figures`(발표용 단순화 그림만)
 - 순서: cover → contents → (구간마다) section → 내용 장들. **장 구분은 5개**(`sections_count`), `contents`의 item1–5는 그 이름·순서, **item6은 `tail_section` 그대로**(장 이름 `용어와 읽는 법` — 용어 표·읽는 법 장은 코드가 마지막에 붙인다. 용어 장·읽는 법 장을 따로 만들지 않는다)
 - 권장 장 구분: 이 자료 안내 / 큰 그림 / 핵심 개념 / 방법 비교와 기본 단계 / 더 공부할 자료
 - 꼭 담을 것:
-  - 안내: `background.purpose`, '문헌조사 결과가 아니라 결과물을 읽기 위한 배경 설명', 결과물 읽는 순서(00_요약 → 01_배경학습 → 02_문헌지도 → 03_보고서·04_발표 → 05_참고문헌·06_context — `steps4`나 `list`)
+  - 안내: `background.purpose`, '문헌조사 결과가 아니라 결과물을 읽기 위한 배경 설명', 결과물 읽는 순서(00_summary → 01_background → 02_literature_map → 03_report·04_presentation → 05_references·06_context — `steps4`나 `list`)
   - 큰 그림: `big_picture` 단계와 `big_picture_note` (`steps4` — 단계가 5개 이상이면 묶거나 `figures/slide_flow.png`를 `figure_full`로), 분야 구성(역할 → 분야: `figures/slide_tree.png` `figure_full` 또는 `items4`/`items6`)
   - 핵심 개념: `concepts` **전부** — 개념마다 쉬운 설명 + 왜 중요한가 (`points3`·`two_columns`·`items3` 등, 근거 줄 `source`가 논문이면 인용 키)
   - 방법 비교와 기본 단계: `approach_comparison` 전부(원리·장점·한계 — `table`은 칸 40자 이하라 줄여 쓰거나 `items4`), `data_driven_basics`(`steps4`, 5단계 이상이면 묶음). 기존 방법의 한계는 `problems3`도 좋음
-  - 더 공부할 자료: `reviews_guide` 전부(인용 키 + 읽으면 좋은 이유 — `list`). `reviews_guide`가 비어 있으면 이 구간은 '다음에 읽을 것'으로 결과물 안내(03_보고서·05_참고문헌·06_context) 한 장
+  - 더 공부할 자료: `reviews_guide` 전부(인용 키 + 읽으면 좋은 이유 — `list`). `reviews_guide`가 비어 있으면 이 구간은 '다음에 읽을 것'으로 결과물 안내(03_report·05_references·06_context) 한 장
 - 숫자는 입력에 있는 것만
 - 끝 확인: `python alt/prepare_slides.py <run>/ --deck learn --check`

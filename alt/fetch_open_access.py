@@ -14,9 +14,11 @@ pdf_status: downloaded(자동) / manual(사용자가 넣음) / manual_needed(공
 """
 
 import argparse
+import os
 import shutil
 import subprocess
 import re
+import webbrowser
 from pathlib import Path
 
 import requests
@@ -140,7 +142,15 @@ def download_link(ref: dict) -> str | None:
 def open_in_edge(links: list[str]) -> None:
     """링크를 Edge 새 창에서 한꺼번에 연다 — 앱 안 브라우저로 열면 출판사가 사람 확인을 계속 요구함 (사용자 지시 2026-10-16).
     사용자의 브라우저에서 사람이 받는 것이고, 봇 검사를 우회하는 것이 아니다."""
-    subprocess.run(["cmd", "/c", "start", "", "msedge", "--new-window", *links], check=False)
+    # 명령 셸(cmd)에 넘기면 '&'가 든 주소가 잘림 → Edge 실행 파일에 직접 (Codex 검토 2026-10-28). 없으면 기본 브라우저
+    candidates = [shutil.which("msedge"), *(str(Path(os.environ.get(v, "")) / "Microsoft/Edge/Application/msedge.exe")
+                                             for v in ("ProgramFiles(x86)", "ProgramFiles"))]
+    edge = next((c for c in candidates if c and Path(c).is_file()), None)
+    if edge:
+        subprocess.run([edge, "--new-window", *links], check=False)
+    else:
+        for link in links:
+            webbrowser.open(link)
 
 
 def download_todo(references: dict) -> list[str]:
@@ -161,11 +171,17 @@ def main() -> None:
     parser.add_argument("--open-edge", action="store_true", help="직접 받을 논문 링크를 Edge 새 창에서 연다")
     args = parser.parse_args()
 
+    references = read_json(args.run_dir / "references.json")
+    if args.open_edge:  # 지난 수집 결과의 '직접 받을' 목록만 연다 — 다시 받지 않음 (Codex 검토 2026-10-28: 옵션이 연결돼 있지 않았음)
+        links = [link for ref in references.values() if ref.get("pdf_status") in ("manual_needed", "not_oa") and (link := download_link(ref))]
+        if links:
+            open_in_edge(links)
+        print(f"[oa] Edge 새 창에서 링크 {len(links)}개를 엶" if links else "[oa] 직접 받을 논문 없음")
+        return
     email = load_user_settings().get("email")
     if not email:
         raise SystemExit("이메일이 없습니다: python alt/settings.py --email ...")
     max_bytes = load_config()["open_access"]["max_pdf_mb"] * 1024 * 1024
-    references = read_json(args.run_dir / "references.json")
     papers_dir = args.run_dir / "papers"
     papers_dir.mkdir(exist_ok=True)
     session = requests.Session()

@@ -26,7 +26,7 @@ def main() -> None:
     config = load_config()
     verifier = args.verifier or config["verification"]["default_verifier"]
     report = (args.run_dir / variant_name(f"doc_review_{verifier}.md", args.variant)).resolve()
-    docs = {name: variant_name(name, args.variant) for name in ("03_보고서.docx", "04_발표.pptx", "doc_review_input.md")}
+    docs = {name: variant_name(name, args.variant) for name in ("03_report.docx", "04_presentation.pptx", "doc_review_input.md")}
     texts, unreadable = output_texts(args.run_dir, args.variant)
     missing = [actual for actual in list(docs.values())[:2] if actual not in texts]
     if missing:

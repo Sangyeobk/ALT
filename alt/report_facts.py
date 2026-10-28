@@ -92,6 +92,13 @@ def method_lines(meta: dict, records: list[dict], rules: dict, level_of: dict[st
     review = meta.get("review_rules") or rules["scoring"]["review"]
     overrides = meta.get("scoring_overrides", [])
     title_only = sorted(k for k, v in level_of.items() if v == "제목만")
+    # 검증 문구는 실제 수행한 만큼만 (생략·미확인을 완료로 쓰지 않음 — Codex 검토 2026-10-28)
+    verified = sum(bool(r.get("verified")) for r in records)
+    evaluators = meta.get("review_evaluators")  # 없으면 이 값을 기록하기 전 조사
+    review_judged = ("'본문 기여' 기준으로 AI 2개가 평가해 둘 다 통과한" if evaluators and evaluators >= 2
+                     else "'본문 기여' 기준으로 AI 1개가 평가해 통과한 (독립 평가 생략)" if evaluators == 1
+                     else "'본문 기여' 평가 없이 관련성 기준으로 고른" if evaluators == 0
+                     else "관련성 기준을 넘고 목록에 오른 (본문 기여 평가 여부는 기록 없음)")
     # '머리말: 설명' 한 줄씩 (보고서에서 머리말을 굵게 표시). 검색어는 누가 무엇에서 만들었는지와 원문까지 (사용자 피드백 2026-10-15)
     asked = (f"입력 원문 '{topic['input']}' → 확정 주제 '{topic['topic_en']}' · 접근법 '{topic['approach_en']}'" if topic
              else f"입력 주제 '{meta['topic']}' · 접근법 '{meta['approach']}'" if meta.get("topic") and meta.get("approach")
@@ -120,11 +127,12 @@ def method_lines(meta: dict, records: list[dict], rules: dict, level_of: dict[st
         (f"선정 밖 점검: 관련성은 통과했지만 빠진 {p['below_threshold'] + p['over_limit']}편 (총점 미달 {p['below_threshold']}편 · "
          f"상한 초과 {p['over_limit']}편, 그중 인용 0회 {sum(r['status'] in OUTSIDE and r['cited_by_count'] == 0 for r in records)}편) "
          "— 엑셀 '선정 밖 목록'", False),
-        (f"문헌조사논문(리뷰): 관련성 {review['min_relevance']}점 이상 후보를 '본문 기여' 기준으로 AI 2개가 평가해 둘 다 통과한 "
+        (f"문헌조사논문(리뷰): 관련성 {review['min_relevance']}점 이상 후보를 {review_judged} "
          f"{p['reviews_listed']}편 (최대 {review['max_listed']}편, 채우지 않음) — 핵심논문 통계에 섞지 않음", False),
         *([(f"기관·선급 문서: 검색 후보 중 {institutions}편(실린 곳·발행처가 기관·선급) → 관련성 기준 통과 {p.get('institutions_listed', 0)}편을 "
              "따로 목록에 둠 (핵심논문 통계에 섞지 않음)", False)] if institutions else []),
-        ("교차 채점: 다른 AI가 관련성을 다시 채점해 낮은 점수 채택 — 재현 가능한 절차일 뿐 신뢰성 입증은 아님", False),
+        ((f"교차 채점: 다른 AI가 {verified}편의 관련성을 다시 채점해 낮은 점수 채택 — 재현 가능한 절차일 뿐 신뢰성 입증은 아님" if verified
+          else "교차 채점: 하지 않음 — 관련성은 채점한 AI 하나의 판단"), False),
     ]
     if update := meta.get("update"):  # 누적 갱신 (사용자 지정 방식, merge_runs.py)
         lines.insert(2, (f"누적 갱신: {update['base_date']} 검색 결과에 같은 검색어로 다시 찾은 새 후보 {update['added_candidates']}편을 더해 "

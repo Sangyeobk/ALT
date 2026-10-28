@@ -30,7 +30,7 @@ from pathlib import Path
 from add_cocited import cocited_count, is_cocited
 from classify_axis import notes_by_id
 from common import RELEVANCE_PASSED, load_config, read_json, scoring_config, write_json
-from review_contribution import contribution_votes
+from review_contribution import contribution_votes, review_eval_files
 
 
 def percentile_ranks(values: dict[str, float | None], population: set[str] | None = None) -> dict[str, float | None]:
@@ -190,8 +190,9 @@ def relevance_format_errors(files: list[Path]) -> list[str]:
     for f in files:
         for i, r in enumerate(read_json(f)):
             rel = r.get("relevance") if isinstance(r, dict) else None
-            if not isinstance(r, dict) or not r.get("openalex_id") or not isinstance(rel, int) or not 0 <= rel <= 5:
-                errors.append(f"{f.name} {i}번째: openalex_id·relevance(0–5 정수) 필요 — 받은 칸 {sorted(r) if isinstance(r, dict) else type(r).__name__}")
+            if (not isinstance(r, dict) or not r.get("openalex_id") or not isinstance(rel, int) or not 0 <= rel <= 5
+                    or not isinstance(r.get("reason"), str)):  # reason은 score()가 필수로 읽음 (Codex 검토 2026-10-28)
+                errors.append(f"{f.name} {i}번째: openalex_id·relevance(0–5 정수)·reason(문장) 필요 — 받은 칸 {sorted(r) if isinstance(r, dict) else type(r).__name__}")
     return errors
 
 
@@ -294,6 +295,7 @@ def score(run_dir: Path, config: dict) -> dict:
             "min_total_score": rules["min_total_score"],
             "max_selected": rules["max_selected"],
             "review_rules": {k: rules["review"][k] for k in ("min_relevance", "max_listed")},
+            "review_evaluators": len(review_eval_files(run_dir)),  # 실제 평가한 AI 수 — 산출물 문구가 이 값을 따름 (Codex 검토 2026-10-28)
             "adjacent_rules": rules["adjacent"],
             "update": update,
             "prisma": {

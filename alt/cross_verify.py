@@ -111,6 +111,24 @@ def agreement(sample: list[dict], rechecks: list[dict], min_relevance: int) -> d
     }
 
 
+def recheck_problems(sample: list[dict], rechecks: list[dict]) -> list[str]:
+    """검증 응답 완전성 — 표본 전부·중복 없음·0–5 정수·리뷰 판정은 참/거짓. 문제가 있으면 반영하지 않고 검증 미완료 (Codex 검토 2026-10-28)."""
+    asked = {p["openalex_id"] for p in sample}
+    ids = [r.get("openalex_id") for r in rechecks]
+    problems = []
+    if missing := asked - set(ids):
+        problems.append(f"표본 중 빠진 논문 {len(missing)}편")
+    if extra := set(ids) - asked:
+        problems.append(f"표본에 없는 id {len(extra)}개")
+    if dup := {i for i in ids if ids.count(i) > 1}:
+        problems.append(f"중복 id {len(dup)}개")
+    bad = [r.get("openalex_id") for r in rechecks if type(r.get("verifier_relevance")) is not int or not 0 <= r["verifier_relevance"] <= 5
+           or type(r.get("verifier_is_review")) is not bool]  # 프롬프트가 둘 다 요구 (verify_prompt.md)
+    if bad:
+        problems.append(f"점수(0–5 정수)·리뷰 판정(true/false) 형식 오류 {len(bad)}건")
+    return problems
+
+
 def merge_rechecks(path: Path, verifier: str, rechecks: list[dict]) -> dict:
     """검증자 재채점을 누적 파일(verifier_rechecks.json)에 합친다. 점수 결정 규칙은 score_papers.py가 적용."""
     merged = read_json(path) if path.is_file() else {}
@@ -137,7 +155,7 @@ def relevance_rounds(run_dir: Path, verifier: str) -> list[Path]:
 
 def target_files_note(input_name: str, variant: str | None) -> str:
     """검증자에게 이번에 볼 파일을 정확히 알려 줌 — 한 폴더에 여러 판(초록·전문활용)이 있어 섞이지 않게."""
-    outputs = (["02_문헌지도.png"] + [variant_name(n, variant) for n in OUTPUT_NAMES]) if variant is not None else []
+    outputs = (["02_literature_map.png"] + [variant_name(n, variant) for n in OUTPUT_NAMES]) if variant is not None else []
     return ("## 이번 검증 대상 파일 (아래 규칙의 파일 이름보다 우선)\n"
             f"- 입력: `{input_name}`\n- 산출물: {', '.join(f'`{n}`' for n in outputs) if outputs else '보지 않음'}\n"
             + ("- Office 본문은 입력의 output_texts에 파일별로 추출되어 있음. 셸 실행 없이 이 본문을 검증함. "
@@ -203,6 +221,9 @@ def main() -> None:
     parsed = last_json_block(report_path.read_text(encoding="utf-8"))
     if parsed is None:
         raise SystemExit(f"[verify] 보고서에 JSON 블록이 없음 → {report_path} 직접 확인 필요")
+    if problems := recheck_problems(sample, parsed.get("relevance_rechecks") or []):  # 산출물 검증(--outputs)도 같은 기준
+        write_json(report_path.with_suffix(".json"), {"verdict": "미완료", "problems": problems})
+        raise SystemExit(f"[verify] 검증 응답 불완전 — 재채점을 반영하지 않음 (검증 미완료, 다시 실행): {'; '.join(problems)} -> {report_path}")
     stats = agreement(sample, parsed["relevance_rechecks"], scored["meta"]["min_relevance"])
     if not args.outputs:
         merge_rechecks(rechecks_path, verifier, parsed["relevance_rechecks"])

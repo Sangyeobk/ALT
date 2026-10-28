@@ -1,13 +1,13 @@
 ---
 name: run
-description: ALT (Agentic Literature Tracker) — 주제·접근법·기간으로 문헌조사를 수행해 요약, 문헌지도, docx 보고서, pptx 발표, 점수화된 참고문헌, 코딩용 context.md를 만든다. "/alt:run"만 쳐도 주제·접근법·기간을 물어 시작한다 ("/alt:run 주제, 접근법, 기간"으로 바로 넣어도 됨). 기능은 세 가지 — 새 프로젝트 / 프로젝트 업데이트(논문 재검색) / 결과물 피드백(재검색 없이 방향·품질 수정, 새 형식 결과물) — 이고 따로 명령 없이 대화로 고른다.
+description: ALT (Agentic Literature Tracker) — 주제·접근법·기간으로 문헌조사를 수행해 요약, 문헌지도, docx 보고서, pptx 발표, 점수화된 참고문헌, 코딩용 context.md를 만든다. "/alt:run"(Codex는 "$alt:run")만 쳐도 주제·접근법·기간을 물어 시작한다 ("/alt:run 주제, 접근법, 기간"으로 바로 넣어도 됨). 기능은 세 가지 — 새 프로젝트 / 프로젝트 업데이트(논문 재검색) / 결과물 피드백(재검색 없이 방향·품질 수정, 새 형식 결과물) — 이고 따로 명령 없이 대화로 고른다.
 ---
 
 # ALT 작업 절차 (개발 중 — ✅ 구현됨 / ⏳ 개발 예정)
 
 **먼저 공통 정책 원본 `alt/agent_guide.md`를 읽는다** (이 파일 기준 `../../alt/agent_guide.md`, 플러그인에서는 `${CLAUDE_PLUGIN_ROOT}/alt/agent_guide.md`). 이 절차는 Claude Code·Codex/GPT 공통이다. 승인·자료 보존·독립 검증·실행별 예외는 공통 원본을 따른다.
 
-아래 `PY`, `${CLAUDE_PLUGIN_ROOT}`, `AskUserQuestion`, `alt:alt-*`, 사용량 장부 명령은 공통 원본의 **실행 어댑터**대로 현재 환경에 맞춘다. 특히 Codex/GPT 직접 실행은 같은 역할 지침·파일 이름·검사를 사용한다. 코드·지침은 설치 루트, 결과·양식은 사용자 작업 폴더에 둔다.
+아래 `PY`, `${CLAUDE_PLUGIN_ROOT}`, `AskUserQuestion`, `alt:alt-*`, 사용량 장부 명령은 공통 원본의 **실행 어댑터**대로 현재 환경에 맞춘다. **Codex 플러그인으로 설치했으면 `${CLAUDE_PLUGIN_ROOT}` = 이 SKILL.md가 있는 폴더의 두 단계 위**(설치 루트)로 바꿔 쓴다 (2026-10-28 Codex 설치 시험으로 확인). 특히 Codex/GPT 직접 실행은 같은 역할 지침·파일 이름·검사를 사용한다. 코드·지침은 설치 루트, 결과·양식은 사용자 작업 폴더에 둔다.
 
 **승인 문구 적용**: 아래의 질문·승인 단계는 아직 결정되지 않은 사항에만 적용한다. 이미 승인된 기능은 재승인 없이 진행하며, 검증 생략·재호출 금지는 이어 하기에서도 유지한다. 실행 승인만으로 논문별 사용자 확인 기록을 만들지 않는다.
 진행 메시지는 단계마다 한 줄만 쓴다 (예: `②/⑧ 검색 중…`).
@@ -22,6 +22,8 @@ Claude Code와 Codex가 같은 조사를 이어받을 때는 같은 결과 폴�
 | **1. 새 프로젝트** | 새 주제로 조사 | '0. 준비' → 0-1 주제 구체화 → ①–⑩ (결과 폴더 하나) |
 | **2. 프로젝트 업데이트 (논문 재검색)** | 같은 주제를 다시 검색해 그사이 나온 논문을 더함 | '누적 갱신' 절 (새 후보 채점 → 다시 선정 → NEW·제외됨(이전 선정) 표시 → 바뀐 부분만 요약 수정) |
 | **3. 결과물 피드백 (재검색 없음)** | 이미 찾은 논문으로 결과물의 방향·품질을 고치거나 새 형식의 결과물을 만듦 | '사용자 피드백 처리' → '피드백 반영'(이번 결과) / '이 조사 맞춤'(이 조사 문체·구성·새 형식 결과물 `project/extras`) / '보고서·발표 스타일 조정'(모든 조사). 사용자가 PDF를 더 넣었으면 '새 전문 반영'도 여기서 |
+
+**순서**: 아래 '0. 준비'의 실행 환경 확인으로 `PY`를 먼저 정한 뒤 0 → 1 (Codex 검토 2026-10-28 — `run_status.py`도 `PY`가 필요).
 
 0. **작업 폴더 확인** (사용자 요청 2026-10-27 — 결과는 세션을 연 폴더의 `outputs/`에 쌓임): 아래 1번의 `run_status.py`가 `[workspace] 작업 폴더 미지정: <폴더> — <이유>`를 내고 끝나면(종료 코드 2) **다른 단계를 진행하지 않고** 사용자에게 지금 폴더를 보여 주며 AskUserQuestion: ① 여기를 ALT 작업 폴더로 쓰기 → `PY "${CLAUDE_PLUGIN_ROOT}/alt/run_status.py" --init-workspace` 뒤 1번 다시 ② 다른 폴더에서 다시 열기 — Claude Code 데스크톱은 그 폴더를 골라 새 세션, 터미널은 그 폴더로 이동해 `claude`(또는 Codex는 `codex.cmd`) 실행. 홈 폴더·드라이브 맨 위는 ①을 고를 수 없음(결과가 쌓일 폴더를 하나 만들어 열도록 안내)
 1. **시작할 때 늘 기존 조사 확인**: `PY "${CLAUDE_PLUGIN_ROOT}/alt/run_status.py"`(결과 폴더 목록: 주제·다음 단계·지난 검색일).
@@ -38,9 +40,10 @@ Claude Code와 Codex가 같은 조사를 이어받을 때는 같은 결과 폴�
 - `PY "${CLAUDE_PLUGIN_ROOT}/alt/settings.py" --show`로 이메일이 있는지 확인한다 (개인 스타일·검색 취향 내용도 함께 나옴). 없으면 사용자에게 **회사 메일을 한 번만** 묻고 `PY "${CLAUDE_PLUGIN_ROOT}/alt/settings.py" --email ...`으로 저장한다.
 - **OpenAlex 키** (사용자 결정 2026-10-19 → 2026-10-27 '사용자가 할 일 최소화'로 바꿈): 처음 실행 때는 묻지 않는다. 아래 '예외'처럼 키 없이 검색이 한도(HTTP 429 등)로 실패했을 때만 안내한다. 안내 내용은 — 키가 없으면 회사 IP 전체가 하루 검색 예산(약 100번)을 함께 써서 바닥날 수 있고, 무료 키를 넣으면 개인 예산이 생김. 받는 법: https://openalex.org/settings/api 에서 가입·키 **복사** → "복사했어"라고 말하기. 그러면 `PY "${CLAUDE_PLUGIN_ROOT}/alt/settings.py" --openalex-key --from-clipboard`로 저장한다 (키를 채팅에 붙여 넣지 말라고 함께 안내). 거절하면 `PY "${CLAUDE_PLUGIN_ROOT}/alt/settings.py" --skip-openalex-key`로 기록하고 진행 — `not set (declined ...)`이면 다시 묻지 않는다.
   - 예외: 키 없이 OpenAlex 호출이 예산·요청 한도 초과(HTTP 429 등)로 실패하면, 거절 기록이 있어도 그때 한 번 다시 안내한다.
+- **검증 도구 확인** (Codex 검토 2026-10-28 — 채점에 사용량을 쓴 뒤에야 검증 도구가 없음을 알지 않게): 교차 검증할 다른 AI가 설치·로그인돼 있는지 본다 — Claude 실행이면 `codex login status`(Windows는 `codex.cmd`, 'Logged in'이면 준비), Codex 실행이면 `claude auth status`('"loggedIn": true'면 준비). 명령이 없거나 로그인 안 됨이면 따로 멈추지 않고, 0-1 최종 확인 메시지에 "다른 AI 준비 안 됨 → 교차 검증·독립 평가 생략(결과물에 생략으로 표시), 원하면 로그인 뒤 진행"을 한 줄 넣어 같은 승인으로 정한다.
 - 필수 입력 3개(주제, 접근법, 기간) 중 빠진 것만 한 번에 묻는다. 나머지는 기본값을 쓴다.
 - 읽기 모드: **초록 모드** = 초록만 읽음(토큰 비용 낮음) / **전문 모드** = 받아 둔 PDF는 맥락 정리 후 본문까지 근거로(논문 한 편 본문이 초록의 약 30–100배 글자 — 추정). ⑦에서 PDF를 받았으면 ⑦-1에서 전문 모드(맥락 정리)가 **기본**이다 (사용자 결정 2026-10-16). 새 프로젝트는 0-1 전체 승인 안에서 묻지 않고 전문 모드로 진행한다 (2026-10-27). 사용자가 초록 모드를 원하면 초록 모드.
-- 결과 폴더: `outputs/YYYYMMDD_주제요약/` **하나** (사용자 결정 2026-10-15). 요약·산출물도 **판 구분 없이 한 벌**(`synthesis.json`, `03_보고서.docx` … — 사용자 결정 2026-10-19, 초록판·전문활용판 이름 붙이기 폐지). 읽기 방식은 **기본 초록**, 이 조사에서 전문을 한 번이라도 썼으면(전문 정리 기록·지난 요약이 전문 모드) 이후 갱신도 **전문** — `prepare_synthesis`·`refresh_check`가 `common.run_reading_mode`로 자동으로 고른다. 본문 정리는 쌓여서 다음 갱신에 다시 쓰이므로 다시 읽지 않는다.
+- 결과 폴더: `outputs/YYYYMMDD_주제요약/` **하나** (사용자 결정 2026-10-15). 요약·산출물도 **판 구분 없이 한 벌**(`synthesis.json`, `03_report.docx` … — 사용자 결정 2026-10-19, 초록판·전문활용판 이름 붙이기 폐지). 읽기 방식은 **기본 초록**, 이 조사에서 전문을 한 번이라도 썼으면(전문 정리 기록·지난 요약이 전문 모드) 이후 갱신도 **전문** — `prepare_synthesis`·`refresh_check`가 `common.run_reading_mode`로 자동으로 고른다. 본문 정리는 쌓여서 다음 갱신에 다시 쓰이므로 다시 읽지 않는다.
 
 ## 0-1. 주제 구체화 ✅ (사용자 지시 2026-10-16) — 검색 전에 한 번
 예상 검색어를 제시하기 전에 `PY "${CLAUDE_PLUGIN_ROOT}/alt/search_papers.py" --count-only --years <기간> --query "<검색어>" ... --out outputs/<run>/query_counts.json`으로 검색어별 OpenAlex 편수도 조회한다. API 예산을 쓰며, 편수는 조회 시각 기준·중복 제거 전이다. 상한을 늘리거나 선정 기준을 바꾸는 근거로 자동 사용하지 않는다.
@@ -48,7 +51,7 @@ Claude Code와 Codex가 같은 조사를 이어받을 때는 같은 결과 폴�
 입력은 애매할 수 있다 (예: 'offshore platform'과 'offshore structures'는 검색 범위가 다름). 확정한 이름은 결과물 제목·목적 장·부록에 **그대로** 쓰인다.
 1. **모호한 점 묻기 (사용자 결정 2026-10-21 — 특히 주제, 모호할 때만)**: 입력에서 해석이 갈리는 곳을 찾는다 — 대상 범위(예: platform = 고정식·부유식만 / structures = 모노파일·교량 포함), 현상·물리량(예: '하중' = 파랑·충격·피로 중 무엇), 조사 목적(예측·평가·설계), 용어 뜻·접근법 경계(예: '데이터 기반'에 하이브리드 포함?), 기간 기준. 해석이 갈리는 점마다 AskUserQuestion 한 문항(해석안 2–4개, 한 번에 최대 4문항). 답에서 새 모호함이 생기면 **한 번 더**(최대 2차례). 모호한 점이 없으면 묻지 않고 2로
 2. 답을 반영해 확정안을 만든다: 국문·영문 주제명, 접근법 국문·영문명, 기간, 포함 범위(구조물·하중 종류 등), 제외 범위, 조사 질문 한 줄 + **예상 검색어**(① 규칙대로 영어 검색어 3–6개 — 검색 취향 반영, 각각 국문 뜻 한 줄) + **문헌지도 가로축** — 이 주제의 논문을 나눌 기준 하나(예: 선박 연료 → 모델 종류·자료 종류)와 묶음 3–6개(묶음마다 예시 낱말). 모든 논문이 초록에 값을 적는 기준을 고른다 ('초록에 없음'이 적게)
-3. **최종 문구 확인 + 전체 사용량 승인** (사용자 결정 2026-10-27 — 승인은 여기서 한 번): 확정안과 예상 검색어를 채팅에 **문구 그대로** 보여 주고, 같은 메시지에 전체 예상 사용량 표(`usage_log.py budget --used-5h <사용률> --papers <검색어별 편수 합 — 중복 제거 전이라 많게 잡힘>`, 읽기 모드는 전문 기본)를 붙여 AskUserQuestion으로 "이대로 진행(끝까지 실행) / 고칠 곳 있음"(+ Other로 직접 수정). '이대로 진행'이 ①–⑩ 전체 실행 승인이다. 고치면 반영해 다시 보여 주고 확인받는다. 질문 1에서 묻지 않았더라도 ② 더 넓게·③ 더 좁게 안이 뚜렷하면 선택지에 넣는다
+3. **최종 문구 확인 + 전체 사용량 승인** (사용자 결정 2026-10-27 — 승인은 여기서 한 번): 확정안과 예상 검색어를 채팅에 **문구 그대로** 보여 주고, 같은 메시지에 전체 예상 사용량 표(`usage_log.py budget [--used-5h <사용률>] --papers <검색어별 편수 합 — 중복 제거 전이라 많게 잡힘>`, 읽기 모드는 전문 기본 — 본문 정리 편수는 ⑦ 뒤에 정해지므로 표 끝 '아직 편수를 모르는 단계' 줄을 그대로 보여 주고 승인 범위에 포함됨을 알린다)를 붙여 AskUserQuestion으로 "이대로 진행(끝까지 실행) / 고칠 곳 있음"(+ Other로 직접 수정). '이대로 진행'이 ①–⑩ 전체 실행 승인이다. 고치면 반영해 다시 보여 주고 확인받는다. 질문 1에서 묻지 않았더라도 ② 더 넓게·③ 더 좁게 안이 뚜렷하면 선택지에 넣는다
 4. `PY "${CLAUDE_PLUGIN_ROOT}/alt/define_topic.py" <run>/ --input "<입력 원문 그대로>" --topic-ko ... --topic-en ... --approach-ko ... --approach-en ... --years ... --include ... --exclude ... --question ... --clarify "<질문> => <답>" ... --query "<확인받은 검색어>" ... --axis-name "<축 이름>" --axis-group "<묶음>: <낱말1>, <낱말2>" ...` → `<run>/topic.json`. 결과 폴더 이름은 확정 영문명 요약으로. `--clarify`는 질문 1에서 물은 것마다 (부록 '입력 원문 → 확정 주제'에 '해석 확인'으로 나옴)
    - **입력과 다른 안(더 넓게·더 좁게·직접 수정)을 골랐으면** `--scope-reason "<왜 바꿨는지 한 줄>"`도 함께 (사용자 피드백 2026-10-16 — 없으면 결과물만 본 사람에게 제목과 입력이 달라 보임). 결과물 목적 장 맨 앞에 '입력 원문 → 범위 결정'으로 나온다
 5. 이후 단계는 이 기록을 쓴다: ① 검색어는 `topic.json`의 `queries` 그대로(없으면 `topic_en` + 포함 범위로 만듦), ④ `prepare_relevance_batches.py`가 확정명·범위를 채점 입력에 넣음(`--topic/--approach` 생략), ⑧ 요약 `names`는 확정명 그대로, ⑨ 제목·목적 장 첫 줄·부록 '입력 원문 → 확정 주제'는 코드가 넣음
@@ -61,7 +64,7 @@ Claude Code와 Codex가 같은 조사를 이어받을 때는 같은 결과 폴�
   - **재확인**: 큰 단계가 끝날 때마다 장부(`show`)의 실제 처리량이 추정 × `usage.overrun_factor`를 넘었거나, 다음 단계 예상 %가 남은 %(100 − 지금 사용률)보다 크면 초과 사실을 보고한다. 명시된 예산·승인 범위를 벗어나는 추가 실행만 멈추고 확인한다.
   - **보정**: 큰 단계 전후 `get_usage` 사용률로 `usage_log.py calibrate <run>/ --step <단계> --before <전> --after <후>`를 남긴다. 보정 기록이 쌓이기 전에는 %를 "환산 불가"로 밝히고 처리량만 보여 준다 (지어내지 않음).
   - 다른 서비스로 실행하는 검증 단계는 현재 서비스 한도와 합산하지 않고 해당 서비스의 확인 가능한 처리량만 보여 준다.
-  - `get_usage`가 없는 환경(Codex 등)이면 처리량만 보여 주고 기존 승인 범위를 적용한다.
+  - `get_usage`가 없는 환경(Codex 등)이면 `--used-5h`를 빼고 실행해 처리량만 보여 주고 기존 승인 범위를 적용한다 (사용률을 0으로 넣지 않음).
 - **추정**: 읽을 글자 수 ÷ `fulltext.chars_per_token` = 한 번 읽는 토큰 (추정이라고 밝힘). 실제는 더 큼 — 에이전트는 나눠 읽으며 매 단계 앞 내용을 다시 넣고, 지침·출력이 더해짐. 단계 처리량 기준값은 `config.yaml usage.reference_tokens`(실측).
 - **줄이는 선택지 2–4개**를 효과·단점과 함께 제안: 범위 줄이기(우선 대상만 → 결과 보고 뒤 확대) / 필요한 절만 남기기(서론·선행연구·참고문헌 자르기) / 에이전트 1개당 1편(앞 논문을 들고 다니는 반복 없음) / 가벼운 모델로 정리(Sonnet 등, 검토는 기존 모델) / 전체 재작성 대신 기존 결과 보강.
 - 끝난 뒤 **장부(`usage_log.py`)의 실제 사용량**을 추정과 함께 보고한다 (다음 범위 결정의 근거). Agent 결과의 토큰 수는 누적이 아니라 마지막 문맥 크기로 보이므로(2026-10-16 확인, 가설) 그대로 보고하지 않는다.
@@ -118,7 +121,7 @@ Claude Code와 Codex가 같은 조사를 이어받을 때는 같은 결과 폴�
 ## ⑤-1 교차 검증 ✅ (다른 AI)
 `PY "${CLAUDE_PLUGIN_ROOT}/alt/cross_verify.py" <run>/ --verifier <다른 AI>` — Claude 생성이면 `codex`, Codex/GPT 생성이면 `claude`를 명시한다. 이하 검증 호출에도 같은 선택을 적용한다. 실행별 검증 생략·재호출 금지는 공통 정책을 따른다.
 - 검증자는 읽기 전용. 선정·리뷰·경계 논문을 다시 채점하고 선정 규칙·산출물(있으면)을 확인해 `verification_<검증자>.md`를 쓴다.
-- 결과 처리: 선정 경계가 뒤집힌 논문·2점 이상 차이 나는 논문은 생성 담당 AI가 초록을 다시 읽고 판단을 정한다. 판단이 갈리면 사용자에게 선택지로 보여 준다 (임의로 점수를 바꾸지 않음).
+- 결과 처리 (사용자 결정 2026-10-13 — 관련성은 두 AI 중 **낮은 점수**, 리뷰 판정은 한쪽이라도 리뷰면 리뷰): 검증 뒤 `PY "${CLAUDE_PLUGIN_ROOT}/alt/score_papers.py" <run>/`를 **다시 실행**해야 이 규칙이 선정에 반영된다 (재채점은 `verifier_rechecks.json`에 쌓이고 점수화가 읽음). 다시 점수화해 새로 선정·리뷰 목록에 든 논문이 아직 재채점되지 않았으면 `cross_verify.py <run>/ --verifier <다른 AI> --only-unverified` → 다시 점수화를 **선정·리뷰 목록에 미검증 논문이 없을 때까지** 되풀이한다 (보통 2회차면 끝남). 검증자가 연구논문을 리뷰로 바꾼 논문이 있으면 ⑤-2(`review_contribution.py --prepare` → 두 평가)를 다시 해 그 리뷰의 기여도 평가한다. 선정 경계가 뒤집힌 논문·2점 이상 차이 난 논문은 ⑥ 중간 확인에 함께 보여 준다. 규칙 밖으로 점수를 임의로 바꾸지 않는다 (Codex 검토 2026-10-28 — 다시 점수화 단계가 빠져 있었음).
 - 산출물을 만든 뒤(⑨)에도 한 번 더 실행해 지어낸 문헌·숫자 불일치를 확인한다.
 
 ## ⑥ 중간 확인 (사용자)
@@ -140,7 +143,7 @@ Claude Code와 Codex가 같은 조사를 이어받을 때는 같은 결과 폴�
 `PY "${CLAUDE_PLUGIN_ROOT}/alt/prepare_synthesis.py" <run>/` (references.json·synthesis_input.json — 다시 돌려도 이미 쓴 인용 키는 유지) → `PY "${CLAUDE_PLUGIN_ROOT}/alt/fetch_biblio.py" <run>/` (APA용 권·호·쪽) → `PY "${CLAUDE_PLUGIN_ROOT}/alt/fetch_open_access.py" <run>/` (papers/)
 - Unpaywall의 모든 공개 위치(출판사·저장소·arXiv)를 차례로 시도한다. 이미 받은 파일은 건너뛴다.
 - **레퍼런스 폴더** (사용자 결정 2026-10-22, `${CLAUDE_PLUGIN_ROOT}/alt/library.py`, `config open_access.library_dir` = `outputs/references/`): 모든 조사의 전문 PDF(파일 이름 `저자성연도_DOI.pdf`)와 맥락 정리를 한 곳에 모은다. `fetch_open_access.py`가 먼저 여기서 같은 논문(DOI, 없으면 제목)을 찾아 조사 폴더로 **복사**하고(다시 받지 않음, 직접 받을 목록에도 안 나옴, 출력 '레퍼런스 폴더에 있는 PDF n편 복사'), 끝에 새로 받은 PDF(직접 받은 것 포함)를 등록한다. 손으로 등록: `PY "${CLAUDE_PLUGIN_ROOT}/alt/library.py" --sync <run>/`
-- 출판사가 자동 내려받기를 막으면(403·봇 검사·CAPTCHA) 우회하지 않고 '직접 받기 필요'로 남긴다 → `05_참고문헌.xlsx`의 '수집 경로' 열.
+- 출판사가 자동 내려받기를 막으면(403·봇 검사·CAPTCHA) 우회하지 않고 '직접 받기 필요'로 남긴다 → `05_references.xlsx`의 '수집 경로' 열.
 - 직접 받을 PDF는 **기다리지 않는다** (2026-10-27): 받은 PDF로 끝까지 진행하고, 목록은 완료 보고에 넣어 "받아서 넣으면 '새 전문 반영'으로 보강"이라고 안내한다.
 - **사용자에게 직접 받을 목록을 줄 때는 논문마다 바로 열 수 있는 링크를 함께 준다** (사용자 결정 2026-10-16 — DOI만으로는 받기 불편). `fetch_open_access.py`가 끝에 '직접 받을 논문' 목록(인용 키·실린 곳·링크·제목)을 출력하므로 그 링크를 그대로 표에 넣는다. 링크는 무료 사본 위치(`oa_landing_url`), 없으면 `https://doi.org/...`.
   - 링크는 **Edge 새 창에서 연다** (사용자 지시 2026-10-16 — 앱 안 브라우저로 열면 출판사가 사람 확인을 계속 요구함): 목록을 보여 준 뒤 `PY "${CLAUDE_PLUGIN_ROOT}/alt/fetch_open_access.py" <run>/ --open-edge`로 한꺼번에 열어 준다. 사람이 자기 브라우저에서 받는 것이며 봇 검사를 우회하지 않는다.
@@ -186,14 +189,14 @@ Claude Code와 Codex가 같은 조사를 이어받을 때는 같은 결과 폴�
 ## ⑨ 산출물 생성 ✅
 ```
 PY "${CLAUDE_PLUGIN_ROOT}/alt/fetch_affiliations.py" <run>/                # 대표 소속 국가(교신저자 → 없으면 1저자) → 분포 그림 대륙 막대 (인터넷 조회만, 이미 받은 논문 건너뜀)
-PY "${CLAUDE_PLUGIN_ROOT}/alt/make_figures.py" <run>/       # 공통: 02_문헌지도.png, figures/prisma.png, gap_matrix.png / 판별: theory_flow.png(흐름도+문헌), limit_response.png(한계→대응)
-PY "${CLAUDE_PLUGIN_ROOT}/alt/export_references.py" <run>/  # 05_참고문헌.xlsx(선정/리뷰/전체/데이터) + .bib
-PY "${CLAUDE_PLUGIN_ROOT}/alt/write_markdown.py" <run>/     # 00_요약.md, 06_context.md
-PY "${CLAUDE_PLUGIN_ROOT}/alt/build_docx.py" <run>/         # 03_보고서.docx
+PY "${CLAUDE_PLUGIN_ROOT}/alt/make_figures.py" <run>/       # 공통: 02_literature_map.png, figures/prisma.png, gap_matrix.png / 판별: theory_flow.png(흐름도+문헌), limit_response.png(한계→대응)
+PY "${CLAUDE_PLUGIN_ROOT}/alt/export_references.py" <run>/  # 05_references.xlsx(선정/리뷰/전체/데이터) + .bib
+PY "${CLAUDE_PLUGIN_ROOT}/alt/write_markdown.py" <run>/     # 00_summary.md, 06_context.md
+PY "${CLAUDE_PLUGIN_ROOT}/alt/build_docx.py" <run>/         # 03_report.docx
 PY "${CLAUDE_PLUGIN_ROOT}/alt/prepare_slides.py" <run>/     # ⑨-1 발표 구성안 입력 (양식에 장 종류 목록이 있을 때만 — 기본 양식 01)
                                     #   → alt:alt-writer: slides_input.json → slides.json (alt/slides_guide.md) → --check 통과까지
-PY "${CLAUDE_PLUGIN_ROOT}/alt/prepare_slides.py" <run>/ --deck learn   # 01_배경학습 구성안 입력 → alt:alt-writer: slides_learn_input.json → slides_learn.json → --deck learn --check
-PY "${CLAUDE_PLUGIN_ROOT}/alt/build_pptx.py" <run>/         # 04_발표.pptx·01_배경학습.pptx (구성안대로 양식 장에 채움, 배경학습 끝에 용어 표·읽는 법은 코드가)
+PY "${CLAUDE_PLUGIN_ROOT}/alt/prepare_slides.py" <run>/ --deck learn   # 01_background 구성안 입력 → alt:alt-writer: slides_learn_input.json → slides_learn.json → --deck learn --check
+PY "${CLAUDE_PLUGIN_ROOT}/alt/build_pptx.py" <run>/         # 04_presentation.pptx·01_background.pptx (구성안대로 양식 장에 채움, 배경학습 끝에 용어 표·읽는 법은 코드가)
 PY "${CLAUDE_PLUGIN_ROOT}/alt/run_extras.py" <run>/         # 이 조사 맞춤 결과물(07~, project/extras.yaml) — 없으면 아무 일 없음
 ```
 - **발표 구성안 (⑨-1, 사용자 결정 2026-10-21)**: 발표는 보고서를 옮겨 붙이지 않고 **양식의 장 종류(표지·목차·장 구분·숫자·요점·비교·표·그림…)와 칸별 글자 수 한도에 맞춰 새로 쓴다**. 양식은 `config output.pptx_template`(기본 01, `templates/`에만 — git 제외), 장 종류 목록은 그 양식의 `catalog`. 글꼴은 전부 맑은 고딕, 색은 양식. 큰 토큰 단계라 시작 전에 예상 사용량을 보여 주며 기존 승인 밖일 때만 승인받는다 (실측 전 — 첫 실행을 장부로 잼). 요약(⑧)이 바뀌면 구성안도 다시 쓴다. 양식에 목록이 없으면(plain) `build_pptx.py`가 예전 방식으로 만든다
@@ -217,6 +220,7 @@ PY "${CLAUDE_PLUGIN_ROOT}/alt/run_extras.py" <run>/         # 이 조사 맞춤 
 사용자가 PDF를 `papers/`에 더 넣었거나 산출물을 새로 만들고 싶을 때. 결과는 한 벌을 그대로 덮어 다시 만든다 (읽기 방식은 조사마다 자동 — 전문을 쓴 적 있으면 전문). 순서:
 1. `PY "${CLAUDE_PLUGIN_ROOT}/alt/refresh_check.py" <run>/` — 열려 있는 파일이 있으면 **한 번에** 닫아 달라고 하고 다시 점검
 2. `PY "${CLAUDE_PLUGIN_ROOT}/alt/fetch_open_access.py" <run>/` — 넣은 PDF 연결 + 막혔던 자동 수집 재시도
+2-1. **연결한 뒤 다시** `refresh_check.py <run>/`로 새 전문을 판정한다 (Codex 검토 2026-10-28 — 연결 전 점검은 새 PDF를 못 봄). 초록 모드 조사라도 사용자가 PDF를 넣어 반영을 바란 것이므로 '새 PDF n편'이 나오면 `--reading-mode full`로 점검한다 (한 번 정리하면 이후 이 조사는 전문 모드)
 3. 점검 결과 `RESYNTHESIZE=yes`(전문 모드에서 새 전문이 있음)일 때만: ⑦-1 맥락 정리(새 PDF만 — 이미 정리된 논문은 건너뜀) → ⑧ **부분 보강**(새 전문 논문이 인용된 항목만 '피드백 반영' 절차로, 새 논문이 기존 분류에 안 맞으면 선택지 — 전체 재작성은 사용자가 고를 때만) → 필요하면 ⑦-2 → 산출물 후 교차 검증(`cross_verify.py --outputs`)
 4. ⑨ 산출물 전부 다시 만들기 → ⑩ 인용 검사
 5. 보고: 전문 저장 편수 변화(전→후), 검토 수준(전문·초록·제목만), 요약 재생성 여부, 검사 결과
@@ -292,4 +296,3 @@ PY "${CLAUDE_PLUGIN_ROOT}/alt/run_extras.py" <run>/         # 이 조사 맞춤 
 - 레퍼런스 PDF의 판 교체: `PY "${CLAUDE_PLUGIN_ROOT}/alt/library.py" --replace-pdf <새 PDF> --run <기존 조사> --key <인용 키>`. 등록된 레퍼런스만 교체하고 기존 PDF·정리는 `_versions/`에 보존한다. 기존 조사 복사본은 유지하며 새 판의 쪽 번호 정리는 다시 필요하다.
 - 참고문헌은 API 결과에 있는 것만 쓴다. 지어낸 논문·문서 번호는 절대 쓰지 않는다.
 - 가중치·기준 점수는 `${CLAUDE_PLUGIN_ROOT}/alt/config.yaml` 값을 쓰고 AI가 임의로 바꾸지 않는다. 사용자가 경고를 듣고 고른 값(개인 설정·이 조사 맞춤)만 쓰며, 그 사실은 결과에 표시된다.
-- 참고: `${CLAUDE_PLUGIN_ROOT}/.claude/skills/_vendor/literature-review`(체계적 문헌고찰·PRISMA), `_vendor/paper-lookup`(API 사용법).

@@ -33,6 +33,9 @@ def load_catalog(style: dict) -> dict | None:
     path = style.get("catalog")
     if not path:
         return None
+    if not (PROJECT_DIR / path).is_file():  # 양식만 넣고 장 종류 목록은 없음 → 구성안 없이 예전 방식 (Codex 검토 2026-10-28)
+        print(f"[pptx] 장 종류 목록 없음 ({path}) — 구성안 없이 양식에 바로 채움")
+        return None
     catalog = yaml.safe_load((PROJECT_DIR / path).read_text(encoding="utf-8"))
     layout = style.get("figure_side_layout")
     if layout and "figure_side" in catalog["types"]:
@@ -139,7 +142,7 @@ def figure_choices(run_dir: Path, synthesis: dict) -> list[dict]:
     """구성안에 쓸 수 있는 그림 (있는 파일만). 원문 그림은 출처를 코드가 그림 아래에 붙임."""
     # 보고서용 그림(흐름도·계통도·한계→대응)은 붙이지 않고 발표 스타일로 단순화한 그림(make_figures slide_*)을 씀
     # (사용자 피드백 2026-10-21) — 셋 다 가로로 넓음(2.2:1) → figure_full
-    made = [("02_문헌지도.png", "문헌지도 — 후보 문헌 분포 (가로축 × 접근법, 원 크기 = 총점)"),
+    made = [("02_literature_map.png", "문헌지도 — 후보 문헌 분포 (가로축 × 접근법, 원 크기 = 총점)"),
             ("figures/prisma.png", "문헌 선별 흐름도 (PRISMA 형식) — 세로로 긴 그림"),
             ("figures/distribution.png", "논문 수 분포 — 대륙·가로축·접근법"),
             ("figures/slide_flow.png", "기술 흐름 단계 — 단계마다 기존 방법·핵심논문 편수·분야 수 (넓음)"),
@@ -160,7 +163,7 @@ def figure_sources(synthesis: dict) -> dict:
 
 SLIDES_FILE = "slides.json"
 INPUT_FILE = "slides_input.json"
-# 발표 종류 → (구성안 입력, 구성안) — 01_배경학습도 같은 방식으로 다시 씀 (사용자 결정 2026-10-21)
+# 발표 종류 → (구성안 입력, 구성안) — 01_background도 같은 방식으로 다시 씀 (사용자 결정 2026-10-21)
 DECK_FILES = {"talk": (INPUT_FILE, SLIDES_FILE), "learn": ("slides_learn_input.json", "slides_learn.json")}
 # 배경학습 마지막 장 구분 — 용어 표·읽는 법은 코드가 붙임 (사용자 결정 2026-10-21: 용어는 양식 표 장에, 읽는 법은 지금 그림 그대로)
 LEARN_TAIL = ["용어와 읽는 법", "용어 풀이와 결과물 읽는 법"]

@@ -1,4 +1,4 @@
-"""참고문헌 내보내기 → 05_참고문헌.xlsx (보고서의 상세 표 전부 — 시트 목록은 EXCEL_SHEETS), 05_참고문헌.bib
+"""참고문헌 내보내기 → 05_references.xlsx (보고서의 상세 표 전부 — 시트 목록은 EXCEL_SHEETS), 05_references.bib
 
     python alt/export_references.py outputs/<run>/
 """
@@ -160,9 +160,9 @@ def main() -> None:
     order = [name for name, _ in EXCEL_SHEETS]
     wb._sheets.sort(key=lambda ws: order.index(ws.title) if ws.title in order else len(order))
 
-    xlsx = args.run_dir / variant_name("05_참고문헌.xlsx", args.variant)
+    xlsx = args.run_dir / variant_name("05_references.xlsx", args.variant)
     wb.save(xlsx)
-    bib = args.run_dir / variant_name("05_참고문헌.bib", args.variant)
+    bib = args.run_dir / variant_name("05_references.bib", args.variant)
     bib.write_text("\n".join(bibtex(r) for r in references.values()), encoding="utf-8")
     print(f"[references] {xlsx.name} (핵심논문 {sum(r['status'] == 'selected' for r in records)}, "
           f"문헌조사논문 {sum(r['status'] == 'review_listed' for r in records)}, 전체 {len(records)}, "

@@ -14,14 +14,17 @@ from pathlib import Path
 
 from common import add_variant, extra_files, load_config, read_json, review_info, run_reading_mode, variant_name
 
-OUTPUT_FILES = ["01_배경학습.pptx", "03_보고서.docx", "04_발표.pptx", "05_참고문헌.xlsx"]
+OUTPUT_FILES = ["01_background.pptx", "03_report.docx", "04_presentation.pptx", "05_references.xlsx"]
 
 
 def slide_plan_status(run_dir: Path) -> dict[str, str]:
-    """요약 이후 두 구성안을 다시 작성해야 하는지 각각 안내한다."""
-    from slides_plan import DECK_FILES
+    """요약 이후 두 구성안을 다시 작성해야 하는지 각각 안내한다. 장 종류 목록이 있는 양식을 쓸 때만 —
+    양식이 없으면(plain) build_pptx.py가 구성안 없이 만들므로 점검하지 않는다 (Codex 검토 2026-10-28)."""
+    from build_pptx import pptx_style
+    from slides_plan import DECK_FILES, load_catalog
+    style = pptx_style()
     source = run_dir / "synthesis.json"
-    if not source.is_file():
+    if not source.is_file() or style["path"] is None or load_catalog(style) is None:
         return {}
     return {name: ("없음" if not (run_dir / name).is_file() else
                    "오래됨" if (run_dir / name).stat().st_mtime < source.stat().st_mtime else "최신")
@@ -59,13 +62,17 @@ def main() -> None:
 
     locked = locked_files(args.run_dir, args.variant)
     line, level_of = review_info(args.run_dir, args.variant)
-    fresh = new_fulltexts(args.run_dir, level_of) if args.reading_mode == "full" else []
+    found = new_fulltexts(args.run_dir, level_of)  # 초록 모드에서도 찾아 알림 (Codex 검토 2026-10-28)
+    fresh = found if args.reading_mode == "full" else []
     print(f"[refresh] 지난 요약: {line}")
     for name, state in slide_plan_status(args.run_dir).items():
         print(f"[refresh] 구성안 {name}: {state}" + (" → prepare_slides.py로 입력 생성 후 구성안 다시 작성" if state != "최신" else ""))
     print(f"[refresh] 열려 있는 파일: {', '.join(locked) if locked else '없음'}" + (" → 닫고 다시 실행" if locked else ""))
     if args.reading_mode == "full":
         print(f"[refresh] 새 전문 {len(fresh)}편: {', '.join(fresh) if fresh else '없음'}")
+    elif found:
+        print(f"[refresh] 초록 모드 조사에 새 PDF {len(found)}편: {', '.join(found)} — 반영하려면 --reading-mode full로 다시 점검 "
+              "(한 번 정리하면 이후 이 조사는 전문 모드)")
     print(f"RESYNTHESIZE={'yes' if fresh else 'no'}")
 
 

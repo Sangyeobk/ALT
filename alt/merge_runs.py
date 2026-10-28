@@ -20,7 +20,7 @@ from common import OUTPUT_NAMES, read_json, write_json
 from search_papers import merge_records, search, title_key
 
 SNAPSHOT_FILES = ["candidates.json", "scored.json", "references.json", "synthesis.json", "citation_keys.json",
-                  "axis_assign.json", "topic.json", "02_문헌지도.png", *OUTPUT_NAMES]
+                  "axis_assign.json", "topic.json", "02_literature_map.png", *OUTPUT_NAMES]
 REFRESH_FIELDS = ("cited_by_count", "fwci", "citation_percentile")  # 시간이 지나면 바뀌는 값 — 같은 논문이면 새 값으로
 
 

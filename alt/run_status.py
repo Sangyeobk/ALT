@@ -17,7 +17,9 @@ from datetime import datetime
 from pathlib import Path
 
 from common import OUTPUT_NAMES, PROJECT_DIR, add_variant, extra_files, load_topic, variant_name
+from add_institution_docs import load_user_docs
 from library import library_dir
+from prepare_synthesis import CITABLE_STATUS
 from refresh_check import slide_plan_status
 
 DONE, TODO, CHECK, UNKNOWN = "끝", "안 함", "확인 필요", "알 수 없음"
@@ -56,7 +58,7 @@ def steps(run: Path, variant: str) -> list[dict]:
     relevance = [run / p.name.replace("relevance_input_", "relevance_") for p in inputs] or [run / "relevance_1.json"]
     reviews = [run / "review_eval_claude.json", run / "review_eval_codex.json"]
     rounds = sorted((p for p in run.glob("verification_*.json") if "_outputs" not in p.name), key=lambda p: p.stat().st_mtime)
-    products = [v(n) for n in OUTPUT_NAMES] + [run / "02_문헌지도.png"]
+    products = [v(n) for n in OUTPUT_NAMES] + [run / "02_literature_map.png"]
     output_checks = [v(f"verification_{who}_outputs.json") for who in ("codex", "claude")]
     output_check = max((p for p in output_checks if p.is_file()), key=lambda p: p.stat().st_mtime, default=output_checks[0])
     document_checks = [v(f"doc_review_{who}.md") for who in ("codex", "claude")]
@@ -73,7 +75,7 @@ def steps(run: Path, variant: str) -> list[dict]:
         ("⑤-1 교차 검증", rounds[-1:] or [run / "verification_codex.json"], relevance, "cross_verify.py (비용 먼저 알림)"),
         ("⑥ 중간 확인 (사용자)", None, None, "기준별 편수·상위 10편을 보여 주고 사용자 확인 → run_status.py --confirm ⑥"),
         ("⑦ 인용 키·무료 PDF", [run / "references.json", v("synthesis_input.json")], [run / "scored.json"],
-         f"prepare_synthesis.py → fetch_biblio.py → fetch_open_access.py (판 {variant})"),
+         f"prepare_synthesis.py → fetch_biblio.py → fetch_open_access.py"),
         ("⑧ 요약", [v("synthesis.json")], [v("synthesis_input.json")], "alt-writer (비용 먼저 알림)"),
         ("⑨ 산출물", products, [v("synthesis.json")],
          f"make_figures·export_references·write_markdown·build_docx·build_pptx --variant {variant}"),
@@ -106,7 +108,11 @@ def steps(run: Path, variant: str) -> list[dict]:
     refs, scored = run / "references.json", run / "scored.json"
     if refs.is_file() and scored.is_file() and _readable(refs) and _readable(scored):  # 선정·리뷰 목록과 인용 키 목록이 같은지 (시각 경고는 그대로 둠)
         listed = {r.get("openalex_id") for r in _load(scored).get("records", [])
-                  if r.get("status") in ("selected", "review_listed") or r.get("adjacent_listed")}  # 주목할 인접 문헌도 인용 목록에 있음
+                  if r.get("status") in CITABLE_STATUS or r.get("adjacent_listed")}  # prepare_synthesis와 같은 기준 — 기관 문서·인접 문헌 포함 (Codex 검토 2026-10-28)
+        try:
+            listed |= {d["openalex_id"] for d in load_user_docs(run)}  # 사용자가 넣은 기관 문서
+        except SystemExit:
+            pass  # docs.yaml을 덜 채움 — 그 단계(add_institution_docs)가 알림
         keyed = {r.get("openalex_id") for r in _load(refs).values() if isinstance(r, dict)}
         if listed != keyed:
             rows["⑦ 인용 키·무료 PDF"].update(state=CHECK, note=f"선정·리뷰·인접 목록과 인용 키 목록이 다름 ({len(listed)} / {len(keyed)}편) → prepare_synthesis.py 다시")
@@ -143,6 +149,12 @@ def next_step(rows: list[dict]) -> dict | None:
     """끝나지 않은 첫 단계 (안 함·알 수 없음). '!' 확인 필요는 경고로 보여 주고 진행 전에 사용자에게 묻는다."""
     return next((row for row in rows if row["state"] in (TODO, UNKNOWN)), None)
 
+
+def finished_label(rows: list[dict]) -> str:
+    """남은 단계가 없을 때 표시 — '!' 확인 필요(검사 실패·오래됨 등)가 남았으면 끝과 구분 (Codex 검토 2026-10-28)."""
+    checks = [row["step"] for row in rows if row["state"] == CHECK]
+    return f"없음 — 단 확인 필요 {len(checks)}건: {', '.join(checks)}" if checks else "없음 (끝)"
+
 def run_topic(run: Path) -> str:
     """조사 주제: 확정 주제(topic.json) → 점수화 meta의 주제 → 검색어 첫 줄 → 없으면 '-'."""
     if load_topic(run).get("topic_ko"):
@@ -162,8 +174,9 @@ def list_runs(outputs_dir: Path, variant: str) -> list[dict]:
     runs = []
     library = library_dir().resolve()
     for run in sorted(p for p in outputs_dir.iterdir() if p.is_dir() and not p.name.startswith("_") and p.resolve() != library):
-        upcoming = next_step(steps(run, variant))
-        runs.append({"run": run.name, "topic": run_topic(run), "next": upcoming["step"] if upcoming else "없음 (끝)"})
+        rows = steps(run, variant)
+        upcoming = next_step(rows)
+        runs.append({"run": run.name, "topic": run_topic(run), "next": upcoming["step"] if upcoming else finished_label(rows)})
     return runs
 
 
@@ -201,7 +214,7 @@ def main() -> None:
             print(f"[workspace] 작업 폴더 미지정: {PROJECT_DIR} — {problem}")
             raise SystemExit(2)
         runs = list_runs(PROJECT_DIR / "outputs", args.variant) if (PROJECT_DIR / "outputs").is_dir() else []
-        print(f"[status] 결과 폴더 {len(runs)}개 (판: {args.variant})" + ("" if runs else " — 새로 시작"))
+        print(f"[status] 결과 폴더 {len(runs)}개" + ("" if runs else " — 새로 시작"))
         for r in runs:
             print(f" - {r['run']} | 주제: {r['topic']} | 다음: {r['next']}")
         return
@@ -212,11 +225,12 @@ def main() -> None:
         path.write_text(json.dumps(record, ensure_ascii=False, indent=2), encoding="utf-8")
         print(f"[status] {args.confirm} 사용자 확인 기록 -> {path.name}")
     rows = steps(args.run_dir, args.variant)
-    print(f"[status] {args.run_dir.name} (판: {args.variant}) — 파일로 본 안내, 내용 검토 아님")
+    print(f"[status] {args.run_dir.name} — 파일로 본 안내, 내용 검토 아님")
     for row in rows:
         print(f" {MARK[row['state']]} {row['step']}" + (f" — {row['note']}" if row["note"] else ""))
     upcoming = next_step(rows)
-    print(f"다음: {upcoming['step']} — {upcoming['next']}" if upcoming else "다음: 없음 (끝) — 이후 사용자의 말은 피드백으로 처리 (SKILL '기본 동작')")
+    print(f"다음: {upcoming['step']} — {upcoming['next']}" if upcoming
+          else f"다음: {finished_label(rows)} — 이후 사용자의 말은 피드백으로 처리 (SKILL '기본 동작')")
     print("알림: ⑥ 사용자 확인·교차 검증(⑤-1·⑩)·용어 검사·문서 검토는 건너뛰지 않는다. '!' 항목은 진행 전에 사용자에게 확인")
 
 

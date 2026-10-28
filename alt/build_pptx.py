@@ -1,4 +1,4 @@
-"""PPT 2종 → 04_발표.pptx (문헌조사 발표), 01_배경학습.pptx (주제 배경 이해용)
+"""PPT 2종 → 04_presentation.pptx (문헌조사 발표), 01_background.pptx (주제 배경 이해용)
 
     python alt/build_pptx.py outputs/<run>/ [--deck all|talk|learn]
 
@@ -684,7 +684,7 @@ def talk_landscape(deck, c):
                    [6.0, 8.6, 8.2, 9.0], top=7.6, size=12)
     slide = deck.slide("Research Approaches", "[분포] " + (leads.get("map") or f"문헌지도 — {c.axis['name']} × 접근법별 후보 분포"))
     # 그림은 왼쪽에 크게, 관찰은 오른쪽 칸 (사용자 피드백 2026-10-16: 아래에 두면 그림 높이가 묶여 작음)
-    deck.image(slide, c.run_dir / "02_문헌지도.png", top=3.7, max_w=22.5, max_h=BODY_BOTTOM - 3.7, left=BODY_LEFT)
+    deck.image(slide, c.run_dir / "02_literature_map.png", top=3.7, max_w=22.5, max_h=BODY_BOTTOM - 3.7, left=BODY_LEFT)
     deck.bullets(slide, [(i["text"] + cite(i), n == 0) for n, i in enumerate(c.s["map_observations"])],
                  top=4.0, left=24.0, width=BODY_LEFT + BODY_WIDTH - 24.0, height=BODY_BOTTOM - 4.0, size=12)
     dist_png = c.run_dir / "figures" / "distribution.png"
@@ -712,7 +712,7 @@ def subtopic_papers_table(deck, slide, c, t, top: float) -> None:
         return
     deck.table(slide, ["인용 키", "방법", "입력 자료", "검증·결과"], rows, widths, top=top, size=size)
     if len(rows_all) > len(rows):
-        deck.text(slide, f"외 {len(rows_all) - len(rows)}편 — 05_참고문헌 엑셀 '방법 비교' 시트", BODY_LEFT, top + height + 0.15,
+        deck.text(slide, f"외 {len(rows_all) - len(rows)}편 — 05_references 엑셀 '방법 비교' 시트", BODY_LEFT, top + height + 0.15,
                   BODY_WIDTH, note_h, 11, bold=False)
 
 
@@ -788,7 +788,7 @@ def talk_conclusion(deck, c):
 
 
 def talk_appendix_excel(deck, c):
-    slide = deck.slide("Appendix", "[상세 자료] 05_참고문헌.xlsx 시트 안내")
+    slide = deck.slide("Appendix", "[상세 자료] 05_references.xlsx 시트 안내")
     deck.table(slide, ["시트", "내용"], [[name, desc] for name, desc in EXCEL_SHEETS], [7.0, 24.8], size=12)
 
 
@@ -892,7 +892,7 @@ def build_talk_plan(deck: Deck, plan: dict, catalog: dict, run_dir: Path, s: dic
 
 
 def build_learn_plan(deck: Deck, plan: dict, catalog: dict, run_dir: Path, s: dict, meta: dict, refs: dict) -> None:
-    """01_배경학습: 구성안(slides_learn.json) 장 → 코드가 붙이는 마지막 장 구분 '용어와 읽는 법'
+    """01_background: 구성안(slides_learn.json) 장 → 코드가 붙이는 마지막 장 구분 '용어와 읽는 법'
     (용어 표는 양식 표 장에, 읽는 법은 지금 그림 그대로 — 사용자 결정 2026-10-21)."""
     build_talk_plan(deck, plan, catalog, run_dir, s)
     types = catalog["types"]
@@ -936,7 +936,7 @@ def build_how_to_read(deck: Deck, s: dict, meta: dict, refs: dict, run_dir: Path
     deck.arrow(slide, 30.0, 6.5, 30.0, 8.2)
     deck.numbered_box(slide, "(1) 근거 논문 이름표 (인용 키)",
                       ["첫 저자 성 + 발표 연도 (같으면 끝에 a·b)",
-                       "05_참고문헌.xlsx '인용 키' 열에서 찾기 → 제목·원문 링크"], 14.6, 8.4, 12.0, 3.6)
+                       "05_references.xlsx '인용 키' 열에서 찾기 → 제목·원문 링크"], 14.6, 8.4, 12.0, 3.6)
     deck.numbered_box(slide, "(2) ★ = 총점 5단계",
                       [f"총점 = 관련성 {w['relevance']} + 인용 {w['citation']} + 학술지 {w['venue']}",
                        "조사 우선순위 점수 (논문 품질 판정 아님)"], 27.0, 8.4, 5.9, 3.6, size=12)
@@ -950,7 +950,7 @@ def build_how_to_read(deck: Deck, s: dict, meta: dict, refs: dict, run_dir: Path
 
     slide = deck.slide("How to Read", "[읽는 법 ②] 그림 읽기")
     axis_name = map_axis(run_dir)["name"]
-    figures = [(run_dir / "02_문헌지도.png", "(1) 문헌지도",
+    figures = [(run_dir / "02_literature_map.png", "(1) 문헌지도",
                 [f"가로 = {axis_name}, 세로 = 접근법, 원 크기 = 총점", "남색 = 핵심논문, ◆ = 문헌조사논문, 회색 = 기타 후보",
                  "번호 = 핵심논문 상위 (오른쪽 목록)"]),
                (run_dir / "figures" / "prisma.png", "(2) 문헌 선별 흐름도",
@@ -974,7 +974,7 @@ def build_learn(deck: Deck, s: dict, meta: dict, refs: dict, run_dir: Path, vari
 
     slide = deck.slide("Purpose", "[안내] 이 자료의 목적과 읽는 순서")
     deck.bullets(slide, [(b["purpose"], True), ("문헌조사 결과가 아니라, 결과물을 쉽게 읽기 위한 배경 설명", False)], height=3.5)
-    deck.flow(slide, ["00_요약", "01_배경학습\n(이 자료)", "02_문헌지도", "03_보고서\n04_발표", "05_참고문헌\n06_context"],
+    deck.flow(slide, ["00_summary", "01_background\n(이 자료)", "02_literature_map", "03_report\n04_presentation", "05_references\n06_context"],
               top=8.5, highlight_last=False)
 
     # 소제목은 장의 요지 (background.leads) — 없으면 실제 이름으로. 자리표시 말(config placeholder_phrases)은 쓰지 않음 (사용자 피드백 2026-10-16)
@@ -1036,7 +1036,7 @@ def main() -> None:
             build_talk_plan(deck, load_plan(args.run_dir, "talk", style, catalog, refs), catalog, args.run_dir, s)
         else:
             build_talk(deck, s, scored, refs, args.run_dir, args.variant)
-        out = variant_name("04_발표.pptx", args.variant)
+        out = variant_name("04_presentation.pptx", args.variant)
         deck.finish(args.run_dir / out)
         print(f"[pptx] {out} {len(deck.prs.slides)}장")
     if args.deck in ("all", "learn"):
@@ -1046,7 +1046,7 @@ def main() -> None:
             build_learn_plan(deck, load_plan(args.run_dir, "learn", style, catalog, refs), catalog, args.run_dir, s, meta, refs)
         else:
             build_learn(deck, s, meta, refs, args.run_dir, args.variant)
-        out = variant_name("01_배경학습.pptx", args.variant)
+        out = variant_name("01_background.pptx", args.variant)
         deck.finish(args.run_dir / out)
         print(f"[pptx] {out} {len(deck.prs.slides)}장")
 
