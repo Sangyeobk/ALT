@@ -124,10 +124,11 @@ def add_calibration(path: Path, run: str, step: str, before: float, after: float
     return record
 
 
-def step_model(run_dir: Path, step: str) -> str | None:
-    """장부에서 그 단계를 돌린 모델 이름 (하위 에이전트 기록) — 보정 비율은 모델마다 다르므로 함께 남긴다."""
-    models = [read_json(p).get("model") for p in sorted((Path(run_dir) / "usage").glob(f"{step}_*.json"))]
-    return next((m for m in reversed(models) if m), None)
+def step_models(run_dir: Path, step: str) -> set[str | None]:
+    """장부에서 그 단계(Claude 기록)를 돌린 모델들 — 보정 비율은 모델마다 다르므로 섞였는지 본다.
+    파일 이름 앞부분이 아니라 기록의 step으로 고름 ('교차검증'이 '교차검증_산출물'을 잡지 않게, Codex 검토 2026-10-28)."""
+    records = [read_json(p) for p in (Path(run_dir) / "usage").glob("*.json")]
+    return {r.get("model") for r in records if r.get("step") == step and (r.get("source") or "claude") == "claude"}
 
 
 def pct_per_token(path: Path, model: str | None = None) -> float | None:
@@ -202,6 +203,7 @@ def main() -> None:
     calib.add_argument("--before", type=float, required=True, help="단계 전 5시간 사용률 %%")
     calib.add_argument("--after", type=float, required=True, help="단계 뒤 5시간 사용률 %%")
     calib.add_argument("--tokens", type=int, help="처리량 (없으면 장부의 그 단계 합계)")
+    calib.add_argument("--model", help="--tokens가 이 모델 분량일 때 모델 이름 (모델이 섞인 단계)")
     plan = sub.add_parser("budget", help="단계별 예상 처리량과 5시간 한도 대비 %%")
     plan.add_argument("--used-5h", type=float, help="지금 5시간 사용률 %% (앱 get_usage) — 확인할 수 없으면 빼고 처리량·%% 합계만")
     plan.add_argument("--papers", type=int, default=0, help="관련성 채점할 후보 수")
@@ -215,7 +217,14 @@ def main() -> None:
                                       if r["step"] == args.step and r["source"] == "claude"), 0)  # 이 서비스(Claude) 기록만
         if not tokens:
             raise SystemExit(f"[usage] 장부에 '{args.step}' 기록 없음 — --tokens로 직접 주기")
-        model = step_model(args.run_dir, args.step)
+        models = step_models(args.run_dir, args.step) - {None}
+        if args.model:
+            model = args.model
+        elif len(models) > 1 and not args.tokens:  # 섞인 합계를 한 모델의 보정값으로 남기지 않음 (Codex 검토 2026-10-28)
+            raise SystemExit(f"[usage] '{args.step}'에 모델이 섞임 {sorted(models)} — 보정 기록을 남기지 않음 "
+                             "(한 모델 분량을 알면 --tokens와 --model로)")
+        else:
+            model = next(iter(models), None) if len(models) == 1 else None
         record = add_calibration(calibration_path(), str(args.run_dir), args.step, args.before, args.after, tokens, model)
         print(f"[usage] 보정 기록: {args.step} {args.before:g}% → {args.after:g}% / {tokens:,} 토큰 ({model or '모델 미상'}) -> {calibration_path()}")
         return

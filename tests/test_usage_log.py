@@ -136,3 +136,18 @@ def test_other_service_is_a_separate_row(tmp_path):
     save(tmp_path, "문헌조사논문평가", "b", {"source": "codex", **base})
     rows = {(r["step"], r["source"]): r["total"] for r in summary(tmp_path)}
     assert rows == {("문헌조사논문평가", "claude"): 10, ("문헌조사논문평가", "codex"): 10}  # 합치지 않음, 보정은 claude 행만
+
+
+def test_calibrate_refuses_mixed_models(tmp_path, monkeypatch):
+    import usage_log
+    base = {"source": "claude", "calls": 1, "input": 10, "cache_write": 0, "cache_read": 0, "output": 0}
+    usage_log.save(tmp_path, "요약", "a", {**base, "model": "opus"})
+    usage_log.save(tmp_path, "요약", "b", {**base, "model": "sonnet"})
+    usage_log.save(tmp_path, "요약_부분", "c", {**base, "model": "haiku"})  # 이름 앞부분이 같은 다른 단계는 섞이지 않음
+    assert usage_log.step_models(tmp_path, "요약") == {"opus", "sonnet"}
+    monkeypatch.setattr(usage_log, "calibration_path", lambda: tmp_path / "calib.jsonl")
+    monkeypatch.setattr(sys, "argv", ["usage_log.py", "calibrate", str(tmp_path), "--step", "요약", "--before", "1", "--after", "3"])
+    import pytest
+    with pytest.raises(SystemExit):
+        usage_log.main()
+    assert not (tmp_path / "calib.jsonl").exists()
