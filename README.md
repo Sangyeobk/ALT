@@ -38,17 +38,18 @@ Private project logs are preserved separately and are not required in a public i
 
 You need **Windows** and **[Python 3.12](https://www.python.org/downloads/windows/)** (tick *Add python.exe to PATH* when installing — if Python is missing, ALT shows this link and can install it for you).
 
-| | Claude (desktop app) | Codex |
+| | App | Terminal |
 |---|---|---|
-| Install | Settings → **Plugins** → **+ Add** → **Add from repository** → `Sangyeobk/ALT` → install **alt** | In a terminal:<br>`codex plugin marketplace add Sangyeobk/ALT`<br>`codex plugin add alt@alt-marketplace` |
-| Start | Open a session in the folder where results should go, type `/alt:run` | Open Codex in that folder, type `$alt:run` |
+| **Claude** | 1. Settings → **Plugins** → **+ Add** → **Add from repository** → `Sangyeobk/ALT` → install **alt**<br>2. In the Code tab, open the folder where results should go and type `/alt:run` | 1. `claude plugin marketplace add Sangyeobk/ALT`<br>2. `claude plugin install alt@alt-marketplace`<br>3. Run `claude` in the results folder and type `/alt:run` |
+| **Codex** | 1. Once, in a terminal: `codex plugin marketplace add Sangyeobk/ALT`<br>2. Restart the ChatGPT desktop app → **Plugins** → choose the **alt-marketplace** marketplace → install **alt**<br>3. In a new chat on the results folder, type `@` and pick ALT | 1. `codex plugin marketplace add Sangyeobk/ALT`<br>2. `codex plugin add alt@alt-marketplace`<br>3. Run `codex` in the results folder and type `$alt:run` |
+
+Terminal installs need [Git](https://git-scm.com/download/win). The Codex app has no menu for adding a GitHub marketplace, so step 1 is a terminal command ([OpenAI docs](https://developers.openai.com/codex/plugins/build)); the Codex app route follows those docs and has not been tested yet.
 
 That's all — ALT sets up its own Python packages on the first run and asks for anything else it needs.
 
 <details>
-<summary>Other ways to install, and manual setup</summary>
+<summary>Development checkout and manual setup</summary>
 
-- **Claude Code from a terminal** (needs [Git](https://git-scm.com/download/win)): `claude plugin marketplace add Sangyeobk/ALT` then `claude plugin install alt@alt-marketplace`. The terminal and the desktop app share settings, so it also appears in the desktop app. Inside a terminal `claude` session the same works as `/plugin marketplace add …` / `/plugin install …` (in the desktop app `/plugin` only opens the Plugins settings).
 - **Development checkout**: `claude --plugin-dir .` from this folder.
 - **Python packages by hand** (normally automatic, `alt/setup_env.py`), in PowerShell from the plugin folder — keep the environment outside synced folders such as OneDrive:
   ```powershell
