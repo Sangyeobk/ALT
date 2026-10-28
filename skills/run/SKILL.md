@@ -36,7 +36,13 @@ Claude Code와 Codex가 같은 조사를 이어받을 때는 같은 결과 폴�
 4. **새 프로젝트는 세 곳에서만 멈춘다** (사용자 결정 2026-10-27 — "주제·접근법·기간만 넣으면 안내에 따라 끝까지, 설명서 없이"): ① **주제 확정**(0-1: 모호할 때 질문 + 확정 문구·예상 검색어 확인) ② **전체 사용량 한 번 승인**(0-1 최종 확인에 함께 — 이 승인이 ①–⑩ 전체 실행 승인) ③ **⑥ 중간 확인**(선정 결과·기준 점수·문헌지도 축). 그 밖의 단계는 묻지 않고 기본값으로 이어 간다: 큰 단계 사용량은 안내만, ④-2 공통 인용 보강·축 AI 분류·⑦-1 전문 맥락 정리(받은 PDF 전부)는 그대로 진행, 직접 받을 PDF 목록과 ⑧-1 세부 조사 제안은 기다리지 않고 **완료 보고**에 넣는다. 처음 쓰는 사람에게만 한 번 필요한 준비는 예외 — 실행 환경은 묻지 않고 에이전트가 준비(`setup_env.py`), 작업 폴더(정한 적 없는 폴더일 때)·회사 메일만 묻는다 (OpenAlex 키는 검색 한도에 걸렸을 때만, 2026-10-27). 실제 사용량이 승인 때 추정을 크게 넘거나(`usage.overrun_factor`) 남은 한도가 모자라면 그때만 멈추고 확인한다
 
 ## 0. 준비
-- **실행 환경 (처음 한 번, 사용자 대신 에이전트가 — 사용자 결정 2026-10-27)**: 가장 먼저 시스템 파이썬으로 `python "${CLAUDE_PLUGIN_ROOT}/alt/setup_env.py" --check`(없으면 `py -3`). `ready <경로>`면 그 경로가 `PY`다. 아니면 "처음 한 번 실행 환경을 준비합니다(몇 분)"라고 한 줄 알리고 `--check` 없이 실행 → 끝에 나온 `ready <경로>`를 `PY`로 쓴다. 설치 실패 문구는 원문 그대로 보여 준다(사내망 인증서·프록시면 IT 확인). 파이썬 자체가 없으면 그때만 사용자에게 Python 3.12 설치를 안내한다(https://www.python.org/downloads/ — 설치 때 'Add python.exe to PATH' 선택)
+- **실행 환경 (처음 한 번, 사용자 대신 에이전트가 — 사용자 결정 2026-10-27)**: 가장 먼저 시스템 파이썬으로 `python "${CLAUDE_PLUGIN_ROOT}/alt/setup_env.py" --check`(없으면 `py -3`). `ready <경로>`면 그 경로가 `PY`다. 아니면 "처음 한 번 실행 환경을 준비합니다(몇 분)"라고 한 줄 알리고 `--check` 없이 실행 → 끝에 나온 `ready <경로>`를 `PY`로 쓴다. 설치 실패 문구는 원문 그대로 보여 준다(사내망 인증서·프록시면 IT 확인). 파이썬 자체가 없으면(`python`·`py`가 없거나 Microsoft Store 안내만 나옴) **아래 문구를 그대로** 보여 주고 AskUserQuestion으로 '직접 설치함 / 대신 설치해 줘' (사용자 피드백 2026-10-28 — 링크를 주어야 함)
+  > **Python이 필요합니다 (처음 한 번)**
+  > 1. 아래 링크에서 **Python 3.12** 설치 파일(Windows installer 64-bit)을 받습니다: https://www.python.org/downloads/windows/
+  > 2. 설치 첫 화면 아래쪽 **'Add python.exe to PATH'를 체크**하고 **Install Now**를 누릅니다 (관리자 권한 필요 없음).
+  > 3. 끝나면 여기서 "설치했어"라고 알려 주세요. 나머지 준비는 제가 합니다.
+  - '대신 설치해 줘'면 `winget install -e --id Python.Python.3.12 --accept-package-agreements --accept-source-agreements` (Windows 기본 설치 도구, python.org 공식 배포본). winget이 없거나 실패하면 원문을 보여 주고 위 링크로 안내
+  - 설치 뒤 이 세션은 PATH가 갱신되지 않을 수 있으므로 `%LOCALAPPDATA%\Programs\Python\Python312\python.exe`가 있으면 그 경로로 `setup_env.py`를 실행한다. 그래도 못 찾으면 앱을 다시 열어 `/alt:run` 하도록 안내
 - `PY "${CLAUDE_PLUGIN_ROOT}/alt/settings.py" --show`로 이메일이 있는지 확인한다 (개인 스타일·검색 취향 내용도 함께 나옴). 없으면 사용자에게 **회사 메일을 한 번만** 묻고 `PY "${CLAUDE_PLUGIN_ROOT}/alt/settings.py" --email ...`으로 저장한다.
 - **OpenAlex 키** (사용자 결정 2026-10-19 → 2026-10-27 '사용자가 할 일 최소화'로 바꿈): 처음 실행 때는 묻지 않는다. 아래 '예외'처럼 키 없이 검색이 한도(HTTP 429 등)로 실패했을 때만 안내한다. 안내 내용은 — 키가 없으면 회사 IP 전체가 하루 검색 예산(약 100번)을 함께 써서 바닥날 수 있고, 무료 키를 넣으면 개인 예산이 생김. 받는 법: https://openalex.org/settings/api 에서 가입·키 **복사** → "복사했어"라고 말하기. 그러면 `PY "${CLAUDE_PLUGIN_ROOT}/alt/settings.py" --openalex-key --from-clipboard`로 저장한다 (키를 채팅에 붙여 넣지 말라고 함께 안내). 거절하면 `PY "${CLAUDE_PLUGIN_ROOT}/alt/settings.py" --skip-openalex-key`로 기록하고 진행 — `not set (declined ...)`이면 다시 묻지 않는다.
   - 예외: 키 없이 OpenAlex 호출이 예산·요청 한도 초과(HTTP 429 등)로 실패하면, 거절 기록이 있어도 그때 한 번 다시 안내한다.

@@ -37,7 +37,7 @@ Private project logs are preserved separately and are not required in a public i
 ## Requirements
 - [Claude Code](https://claude.com/claude-code) (terminal or desktop app) or [OpenAI Codex CLI](https://github.com/openai/codex) (tested: Codex CLI 0.163 plugin install)
 - [Git](https://git-scm.com/download/win) — needed for the terminal `claude plugin` install from GitHub (Windows: install Git for Windows, open a new terminal, check `git --version`)
-- Python 3.12 (the tested version)
+- [Python 3.12](https://www.python.org/downloads/windows/) (the tested version) — when installing, tick **Add python.exe to PATH**. If it is missing, `/alt:run` shows this link and can install it for you with winget
 - Windows is the tested platform (paths in `SKILL.md` assume it). Network access to api.openalex.org, api.crossref.org and api.unpaywall.org.
 - For default independent verification: the other AI CLI must be available and authenticated (Codex verifies Claude results; Claude verifies Codex results). Explicit run-specific exceptions are recorded, not treated as successful verification.
 
