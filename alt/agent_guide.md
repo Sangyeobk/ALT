@@ -33,6 +33,7 @@ Claude Code, Codex/GPT 및 다른 실행 AI가 함께 따르는 정책 원본이
 - Windows 셸은 PowerShell, 공백·한글 경로는 따옴표로 감싼다. 문서와 코드에는 PC별 절대경로를 넣지 않는다. 한글 문서는 UTF-8로 읽고 보존한다.
 - 가상환경은 OneDrive 밖에 둔다. 기본 예시는 `$env:USERPROFILE/.venvs/alt/Scripts/python.exe`, 의존성은 `requirements.txt`, 시험 명령은 `& "$env:USERPROFILE/.venvs/alt/Scripts/python.exe" -m pytest -q tests`이다. 실제 사용 환경에서 경로를 확인한다.
 - 사내망 인증서는 `alt/common.py`의 `truststore`를 사용하며 인증서 검사를 끄지 않는다. 이메일·API 키는 `~/.alt/settings.yaml`에만 둔다.
+- 결과·입력 파일(JSON·md)은 읽기 도구로 읽고 쓴다. Windows PowerShell 5.1의 `Get-Content`·`Set-Content`는 한글 UTF-8을 깨뜨리므로 쓰지 않고, 셸 처리가 필요하면 `PY`(파이썬, `encoding="utf-8"`)로 한다 (2026-10-28 노트북 실사용 결함).
 - Office 화면 확인은 복사본으로 한다. 사용자 Word·PowerPoint 프로세스를 종료하거나 원본을 직접 열어 방해하지 않는다.
 - Git 작업 전 `git status`로 상태를 확인한다. 커밋·push는 사용자 승인 범위를 따른다. push 전 실제 원격 주소·공개/비공개 상태·올라갈 파일 목록을 확인한다. 오래된 메모의 저장소 상태를 믿고 게시하지 않는다.
 - `.gitignore`는 허용 목록 방식이다. 코드·시험·공개 보조 문서만 공유하며 원자료·결과·기준 원문·개인 개발 문서·내부 검토 문서·양식·키는 제외한다. README 실행 방법을 유지한다(입력은 `/alt:run` 대화로 받으므로 샘플 입력 파일은 두지 않는다 — 사용자 2026-10-27). 배포 새 파일은 `alt/plugin_files.yaml`에도 필요하며 담당 범위 밖이면 목록만 인계한다.
