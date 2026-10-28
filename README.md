@@ -41,9 +41,9 @@ You need **Windows** and **[Python 3.12](https://www.python.org/downloads/window
 | | App | Terminal |
 |---|---|---|
 | **Claude** | 1. Settings → **Plugins** → **+ Add** → **Add from repository** → `Sangyeobk/ALT` → install **alt**<br>2. In the Code tab, open the folder where results should go and type `/alt:run` | 1. `claude plugin marketplace add Sangyeobk/ALT`<br>2. `claude plugin install alt@alt-marketplace`<br>3. Run `claude` in the results folder and type `/alt:run` |
-| **Codex** | 1. Once, in a terminal: `codex plugin marketplace add Sangyeobk/ALT`<br>2. Restart the ChatGPT desktop app → **Plugins** → choose the **alt-marketplace** marketplace → install **alt**<br>3. In a new chat on the results folder, type `@` and pick ALT | 1. `codex plugin marketplace add Sangyeobk/ALT`<br>2. `codex plugin add alt@alt-marketplace`<br>3. Run `codex` in the results folder and type `$alt:run` |
+| **Codex** | 1. **Plugins** → **Add marketplace** → search `Sangyeobk/ALT` → add → install **alt**<br>2. In a new chat on the folder where results should go, type `@` and pick ALT | 1. `codex plugin marketplace add Sangyeobk/ALT`<br>2. `codex plugin add alt@alt-marketplace`<br>3. Run `codex` in the results folder and type `$alt:run` |
 
-Terminal installs need [Git](https://git-scm.com/download/win). The Codex app has no menu for adding a GitHub marketplace, so step 1 is a terminal command ([OpenAI docs](https://developers.openai.com/codex/plugins/build)); the Codex app route follows those docs and has not been tested yet.
+Terminal installs need [Git](https://git-scm.com/download/win).
 
 That's all — ALT sets up its own Python packages on the first run and asks for anything else it needs.
 
