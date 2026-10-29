@@ -26,7 +26,7 @@ from collections import Counter
 from datetime import datetime
 from pathlib import Path
 
-from common import axis_group, load_config, map_axis, read_json, text_axis, write_json
+from common import LANGUAGES, axis_group, load_config, map_axis, read_json, text_axis, write_json
 
 FIELDS = {  # topic.json 칸 → 설명 (모두 필수, note만 선택)
     "input": "입력 원문 그대로", "topic_ko": "확정 주제 (국문)", "topic_en": "확정 주제 (영문, 검색·채점에 씀)",
@@ -126,6 +126,8 @@ def main() -> None:
     parser.add_argument("--parent", default="", help="세부 조사일 때 상위 조사 결과 폴더 (예: outputs/20261016_ship_fuel_consumption)")
     parser.add_argument("--clarify", action="append", default=[], help="'질문 => 답' — 주제 확정 때 물은 모호한 점 (여러 번)")
     parser.add_argument("--query", action="append", default=[], help="사용자가 확인한 영어 검색어 (여러 번) — ② 검색에 그대로 씀")
+    parser.add_argument("--language", choices=LANGUAGES, default="",
+                        help="결과물 언어 (기본 config output.default_language). 주제 칸 없이 주면 기존 기록의 언어만 바꿈")
     args = parser.parse_args()
     history_args = (args.scope_reason, args.split, args.split_run, args.parent)
     parent_name = Path(args.parent.strip().replace("\\", "/").rstrip("/")).name
@@ -147,23 +149,35 @@ def main() -> None:
             raise SystemExit("[topic] topic.json 없음 — 주제를 먼저 확정")
         record = read_json(path)
         record["axis"] = {**axis, "confirmed_at": datetime.now().isoformat(timespec="seconds")}
+        if args.language:  # 함께 준 언어도 반영 (Codex 검토 2026-10-29: 조용히 무시됨)
+            record["language"] = args.language
         write_json(path, record)
         print(f"[topic] 가로축 '{axis['name']}' 저장 -> {path}")
+        return
+    if args.language and not any(history_args) and not any(vars(args).get(k) for k in FIELDS):  # 언어만 바꾸기
+        if not path.is_file():
+            raise SystemExit("[topic] topic.json 없음 — 주제를 먼저 확정")
+        record = {**read_json(path), "language": args.language}
+        write_json(path, record)
+        print(f"[topic] 결과물 언어 {args.language} -> {path}")
         return
     if any(history_args) and not any(vars(args).get(k) for k in FIELDS):  # 기존 기록에 더하기
         if not path.is_file():
             raise SystemExit("[topic] topic.json 없음 — 주제를 먼저 확정")
         record = add_scope_history(read_json(path), *history_args)
+        if args.language:
+            record["language"] = args.language
         write_json(path, record)
         print(f"[topic] 범위 결정 과정 기록 -> {path}")
         return
     record = add_scope_history(topic_record(vars(args), args.note), *history_args)
     record = add_clarifications(record, args.clarify, args.query)
+    record["language"] = args.language or load_config()["output"]["default_language"]
     if axis:
         record["axis"] = {**axis, "confirmed_at": record["confirmed_at"]}
     args.run_dir.mkdir(parents=True, exist_ok=True)
     write_json(path, record)
-    print(f"[topic] {record['topic_ko']} ({record['topic_en']}) · {record['approach_ko']} · {record['years']} -> {path}")
+    print(f"[topic] {record['topic_ko']} ({record['topic_en']}) · {record['approach_ko']} · {record['years']} · 언어 {record['language']} -> {path}")
 
 
 if __name__ == "__main__":

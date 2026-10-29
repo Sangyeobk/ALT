@@ -16,7 +16,7 @@ from docx.oxml.ns import qn
 from docx.shared import Cm, Pt, RGBColor, Twips
 
 from common import (PRISMA_NOTE, Abbreviations, verbatim_strings, add_variant, cite, display_names, keyword_chunks, keyword_tag, tech_keywords, load_config, load_topic, map_axis, read_json, review_info,
-                    report_title, role_label, scope_history, sections, topic_line, variant_name)
+                    report_title, role_label, scope_history, sections, topic_line, tr, tr_later, use_language, variant_name)
 from export_references import EXCEL_SHEETS
 from report_facts import (ADJACENT_NOTE, adjacent_rows, claim_basis, apa_reference, apa_sort_key, excluded_comparison, excluded_rows, fulltext_label, method_lines,
                           role_of)
@@ -253,32 +253,32 @@ def sec_purpose(rpt, c):
     # 확정 주제 + 범위가 정해진 과정을 '구분 | 내용' 표로 (사용자 피드백 2026-10-16·19 — 발표 목적 장과 같은 모양)
     asked = topic_line(c.run_dir, c.refs).partition(": ")[2]
     history = scope_history(c.run_dir)
-    rows = [*[[label, text] for label, text in history if label == "입력 원문"], *([["조사 주제", asked]] if asked else []),
-            *[[label, text] for label, text in history if label != "입력 원문"]]
+    rows = [*[[label, text] for label, text in history if label == tr("입력 원문")], *([[tr("조사 주제"), asked]] if asked else []),
+            *[[label, text] for label, text in history if label != tr("입력 원문")]]
     if rows:
-        rpt.table(["구분", "내용"], rows, [3.0, 13.5], size=9)
-    rpt.bullet("연구 문제: " + sc["question"], emphasis=True)
+        rpt.table([tr("구분"), tr("내용")], rows, [3.0, 13.5], size=9)
+    rpt.bullet(tr("연구 문제: ") + sc["question"], emphasis=True)
     if c.s.get("keywords"):  # 핵심 키워드: 처음 소개해 결론까지 이어 감 (report_guide '핵심 키워드와 용어 통일')
-        rpt.key_box("핵심 키워드 : 보고서 전체에 쓰는 판단 기준",
+        rpt.key_box(tr("핵심 키워드 : 보고서 전체에 쓰는 판단 기준"),
                     [f"{k['term']}: {k['plain']} — {k['question']}" for k in c.s["keywords"]])
     if "landscape" not in sections("report", c.run_dir):  # 흐름도는 연구 접근 장에 한 번만
         rpt.flow(sc["flow"])
     if sc.get("problem_types"):
-        rpt.table(["문제 유형", "입력", "출력", "왜 필요한가"],
+        rpt.table([tr("문제 유형"), tr("입력"), tr("출력"), tr("왜 필요한가")],
                   [[t["name"], t["input"], t["output"], t["why"]] for t in sc["problem_types"]], [3.1, 4.2, 4.2, 5.0], size=9)
     if sc.get("framing"):
-        rpt.bullet("비교 원칙: " + sc["framing"])
-    rpt.bullet("핵심 범위: " + sc["core"])
-    rpt.bullet("활용·확장: " + sc["extension"])
-    rpt.bullet("제외: " + sc["excluded"])
+        rpt.bullet(tr("비교 원칙: ") + sc["framing"])
+    rpt.bullet(tr("핵심 범위: ") + sc["core"])
+    rpt.bullet(tr("활용·확장: ") + sc["extension"])
+    rpt.bullet(tr("제외: ") + sc["excluded"])
 
 
 def sec_summary(rpt, c):
     """핵심 인사이트: 무엇을 조사했나 한 줄(목적 장이 앞에 없을 때만) → 주요 발견 → 해석할 때 유의점."""
     if "purpose" not in sections("report", c.run_dir):  # 목적 장이 맨 앞이면 연구 문제가 이미 나옴 — 반복 금지
-        rpt.bullet("조사 질문: " + c.s["scope"]["question"])
-    rpt.key_box("Key Message : 주요 발견", [tagged(m, c.kw, m["text"]) + cited_short(m) for m in c.s["key_messages"]])
-    rpt.heading("해석할 때 유의점", 2)
+        rpt.bullet(tr("조사 질문: ") + c.s["scope"]["question"])
+    rpt.key_box(tr("Key Message : 주요 발견"), [tagged(m, c.kw, m["text"]) + cited_short(m) for m in c.s["key_messages"]])
+    rpt.heading(tr("해석할 때 유의점"), 2)
     for item in c.s["limitations"]:
         rpt.bullet(item["text"] + cited(item))
 
@@ -289,11 +289,11 @@ def sec_method(rpt, c):
     for text, emphasis in lines:
         if emphasis:
             rpt.labeled(text)
-    rpt.table(["항목", "내용"], [[head, cell_lines(body)] for head, body in (split_head(text) for text, emphasis in lines if not emphasis)],
+    rpt.table([tr("항목"), tr("내용")], [[head, cell_lines(body)] for head, body in (split_head(text) for text, emphasis in lines if not emphasis)],
               [3.2, 13.3], size=9)
     for text in PRISMA_NOTE:
-        rpt.labeled(text)
-    rpt.figure(c.run_dir / "figures" / "prisma.png", f"그림 {c.fig()}. 문헌 선별 흐름도 (PRISMA 흐름도 형식 참조)", 12)
+        rpt.labeled(tr(text))
+    rpt.figure(c.run_dir / "figures" / "prisma.png", tr("그림 {n}. 문헌 선별 흐름도 (PRISMA 흐름도 형식 참조)", n=c.fig()), 12)
 
 
 def sec_landscape(rpt, c):
@@ -302,176 +302,182 @@ def sec_landscape(rpt, c):
     flow_png, roles_png = c.run_dir / "figures" / c.vname("theory_flow.png"), c.run_dir / "figures" / c.vname("limit_response.png")
     ap = display_names(c.run_dir, c.s, c.meta)["approach"]
     if flow_png.is_file():
-        rpt.figure(flow_png, f"그림 {c.fig()}. 기술 흐름에서 {ap} 연구의 위치 —기존 방법은 [일반 개념], "
-                   "편수는 핵심논문, 학습·검증 자료는 초록·본문 판독(중복 포함)")
+        rpt.figure(flow_png, tr("그림 {n}. 기술 흐름에서 {approach} 연구의 위치 —기존 방법은 [일반 개념], "
+                                "편수는 핵심논문, 학습·검증 자료는 초록·본문 판독(중복 포함)", n=c.fig(), approach=ap))
     else:
         rpt.flow(c.s["scope"]["flow"])
     if roles_png.is_file():
-        rpt.figure(roles_png, f"그림 {c.fig()}. 기존 방법의 한계와 {ap}의 대응")
+        rpt.figure(roles_png, tr("그림 {n}. 기존 방법의 한계와 {approach}의 대응", n=c.fig(), approach=ap))
         if c.s.get("approach_roles_note"):
-            rpt.bullet("읽는 법: " + c.s["approach_roles_note"])
+            rpt.bullet(tr("읽는 법: ") + c.s["approach_roles_note"])
     elif c.s.get("approach_roles"):
-        rpt.table(["접근(역할)", "예측 대상", "주로 쓰는 자료", "확인해야 할 성능", "해당 분야"],
+        rpt.table([tr("접근(역할)"), tr("예측 대상"), tr("주로 쓰는 자료"), tr("확인해야 할 성능"), tr("해당 분야")],
                   [[a["role"], a["target"], a["data"], a["check"], a.get("subtopics", "")] for a in c.s["approach_roles"]],
                   [2.8, 3.6, 3.4, 3.8, 2.9], size=9)
         if c.s.get("approach_roles_note"):
-            rpt.bullet("읽는 법: " + c.s["approach_roles_note"])
+            rpt.bullet(tr("읽는 법: ") + c.s["approach_roles_note"])
     tree_png = c.run_dir / "figures" / c.vname("tech_tree.png")
     if tree_png.is_file():  # 기술 계통도가 분야 표를 대신함 (사용자 결정 2026-10-16 — 같은 내용 반복 줄임)
-        rpt.figure(tree_png, f"그림 {c.fig()}. 기술 계통도 — 역할 → 분야(핵심논문 편수·대표 연구) → 대표 기법")
+        rpt.figure(tree_png, tr("그림 {n}. 기술 계통도 — 역할 → 분야(핵심논문 편수·대표 연구) → 대표 기법", n=c.fig()))
     else:
-        rpt.table(["분야", "역할", "편수", "다루는 문제"],
+        rpt.table([tr("분야"), tr("역할"), tr("편수"), tr("다루는 문제")],
                   [[t["name"], role_label(t, c.s), len(t["papers"]), t["problem"]] for t in c.s["subtopics"]],
                   [4.2, 1.8, 1.2, 9.3], size=9)
     floor = c.config["output"]["map_min_relevance"]
     pool = sum(r["relevance"] >= floor and not r["exclude"] for r in c.records)
-    rpt.figure(c.run_dir / "02_literature_map.png", f"그림 {c.fig()}. 문헌지도 — 관련성 {floor}점 이상 후보 {pool}편 (남색 핵심논문, ◆ 문헌조사논문, 회색 기타). "
-               "원 크기는 조사 우선순위 점수이며 품질 판정이 아님")
+    rpt.figure(c.run_dir / "02_literature_map.png", tr("그림 {fig}. 문헌지도 — 관련성 {floor}점 이상 후보 {n}편 (남색 핵심논문, ◆ 문헌조사논문, 회색 기타). "
+                                                       "원 크기는 조사 우선순위 점수이며 품질 판정이 아님", fig=c.fig(), floor=floor, n=pool))
     dist_png = c.run_dir / "figures" / "distribution.png"
     if dist_png.is_file():  # 논문 수 분포 — 대륙·축·접근법 (사용자 피드백 2026-10-19)
-        rpt.figure(dist_png, f"그림 {c.fig()}. 논문 수 분포 — 문헌지도와 같은 후보, 남색은 핵심논문. 대륙은 교신저자 소속(없으면 1저자 소속)")
+        rpt.figure(dist_png, tr("그림 {n}. 논문 수 분포 — 문헌지도와 같은 후보, 남색은 핵심논문. 대륙은 교신저자 소속(없으면 1저자 소속)", n=c.fig()))
     for item in c.s["map_observations"]:
         rpt.bullet(item["text"] + cited(item))
 
 
 def sec_subtopics(rpt, c):
     for i, t in enumerate(c.s["subtopics"], 1):
-        rpt.heading(f"{c.number}.{i} {t['name']} [{role_label(t, c.s)} · {len(t['papers'])}편]", 2)
+        rpt.heading(tr("{number}.{i} {name} [{role} · {n}편]", number=c.number, i=i, name=t["name"], role=role_label(t, c.s),
+                       n=len(t["papers"])), 2)
         # 공학 보고서 전개 (사용자 결정 2026-10-15): 요지 한 줄 → (1) 목적과 방법 → (2) 주요 결과 → (3) 종합 및 남은 과제
         rpt.lead(t.get("lead") or t.get("synthesis", ""))
-        rpt.para("(1) 연구 목적과 방법", 10.5, True, NAVY)
-        rpt.bullet("목적: " + t["problem"])
+        rpt.para(tr("(1) 연구 목적과 방법"), 10.5, True, NAVY)
+        rpt.bullet(tr("목적: ") + t["problem"])
         if t.get("approaches"):
-            rpt.bullet("방법: " + t["approaches"])
-        rpt.bullet("입력 → 출력: " + t["io"])
+            rpt.bullet(tr("방법: ") + t["approaches"])
+        rpt.bullet(tr("입력 → 출력: ") + t["io"])
         if t.get("link"):
-            rpt.bullet("핵심 범위와의 관계: " + t["link"])
-        rpt.para("(2) 주요 결과", 10.5, True, NAVY)
+            rpt.bullet(tr("핵심 범위와의 관계: ") + t["link"])
+        rpt.para(tr("(2) 주요 결과"), 10.5, True, NAVY)
         for item in t["reported"][:2]:
             rpt.bullet(item["text"] + cited(item))
-        rpt.para("(3) 종합 및 남은 과제", 10.5, True, NAVY)
+        rpt.para(tr("(3) 종합 및 남은 과제"), 10.5, True, NAVY)
         if t.get("lead") and t.get("synthesis"):
-            rpt.bullet("종합: " + t["synthesis"])
+            rpt.bullet(tr("종합: ") + t["synthesis"])
         if t["unverified"]:
-            rpt.bullet("남은 과제: " + " / ".join(t["unverified"][:2]), emphasis=True)
+            rpt.bullet(tr("남은 과제: ") + " / ".join(t["unverified"][:2]), emphasis=True)
         for fig in [f for f in c.s.get("figures", []) if f["subtopic"] == t["id"]]:  # 전문 모드: 원문 그림 (출처 표시)
-            rpt.figure(c.run_dir / fig["file"], f"그림 {c.fig()}. {fig['caption']} — 원문 출처: {fig['key']}, {fig['fig']} (p.{fig['page']})", 12)
+            rpt.figure(c.run_dir / fig["file"], tr("그림 {n}. {caption} — 원문 출처: {key}, {fig} (p.{page})", n=c.fig(), caption=fig["caption"],
+                                                  key=fig["key"], fig=fig["fig"], page=fig["page"]), 12)
     extra = len(c.s["subtopics"])
     if c.s.get("cross_synthesis"):
         extra += 1
-        rpt.heading(f"{c.number}.{extra} 분야 간 종합 — 같은 기법이 분야마다 하는 역할", 2)
+        rpt.heading(tr("{number}.{extra} 분야 간 종합 — 같은 기법이 분야마다 하는 역할", number=c.number, extra=extra), 2)
         for item in c.s["cross_synthesis"]:
             rpt.bullet(keyword_tag(item, c.kw) + item["text"] + cited(item))
     if c.s.get("keyword_matrix") and c.kw:  # 분야 × 핵심 키워드: 결론의 키워드 판단이 여기서 나옴
         extra += 1
-        rpt.heading(f"{c.number}.{extra} 분야 × 핵심 키워드", 2)
+        rpt.heading(tr("{number}.{extra} 분야 × 핵심 키워드", number=c.number, extra=extra), 2)
         rpt.lead((c.s.get("leads") or {}).get("matrix", ""))
         width = 12.3 / len(c.kw)
-        rpt.table(["분야"] + [k["term"] for k in c.kw],
-                  [[t["name"]] + [c.s["keyword_matrix"].get(t["id"], {}).get(k["id"], "미확인") for k in c.kw] for t in c.s["subtopics"]],
+        rpt.table([tr("분야")] + [k["term"] for k in c.kw],  # 칸 값 '미확인'은 지침의 정해진 말 — tr (그 밖의 AI 판단 글은 그대로 돌아옴)
+                  [[t["name"]] + [tr(c.s["keyword_matrix"].get(t["id"], {}).get(k["id"], "미확인")) for k in c.kw] for t in c.s["subtopics"]],
                   [4.2] + [width] * len(c.kw), size=9)
     if c.s.get("metrics_table"):  # 전문 모드: 본문 수치 비교
-        rpt.heading(f"{c.number}.{extra + 1} 수치 비교표 (각 연구의 검증 조건에서 보고된 값)", 2)
-        rpt.table(["인용 키", "지표", "값", "조건", "쪽"],
+        rpt.heading(tr("{number}.{extra} 수치 비교표 (각 연구의 검증 조건에서 보고된 값)", number=c.number, extra=extra + 1), 2)
+        rpt.table([tr("인용 키"), tr("지표"), tr("값"), tr("조건"), tr("쪽")],
                   [[m["key"], m["metric"], m["value"], m["condition"], f"p.{m['page']}"] for m in c.s["metrics_table"]],
                   [2.6, 2.4, 2.2, 7.4, 1.4], size=8)
 
 
 def sec_issues(rpt, c):
-    rpt.para("순위는 연구 문제에 비춘 이 조사의 판단이며, 분야의 합의가 아님.", 9)
+    rpt.para(tr("순위는 연구 문제에 비춘 이 조사의 판단이며, 분야의 합의가 아님."), 9)
     for i in sorted(c.s["issues"], key=lambda i: i.get("priority", 99)):
-        rpt.bullet(f"{i.get('priority', '-')}순위: {keyword_tag(i, c.kw)}{i['observation']}{cited(i)}")
-        rpt.bullet("해석상 한계: " + i["limitation"], level=1)
-        rpt.bullet("열린 질문: " + i["question"], level=1)
-    rpt.figure(c.run_dir / "figures" / "gap_matrix.png", f"그림 {c.fig()}. 후보 문헌 분포 (접근법 × {c.axis['name']}, 중복 포함) — "
-               "· 는 조사 표본에서 확인되지 않은 조합이며 연구가 없다는 뜻이 아님", 15)
-    rpt.heading("연구 방향 — 관찰된 접근과 가설", 2)
+        rpt.bullet(tr("{rank}순위: ", rank=i.get("priority", "-")) + f"{keyword_tag(i, c.kw)}{i['observation']}{cited(i)}")
+        rpt.bullet(tr("해석상 한계: ") + i["limitation"], level=1)
+        rpt.bullet(tr("열린 질문: ") + i["question"], level=1)
+    rpt.figure(c.run_dir / "figures" / "gap_matrix.png", tr("그림 {n}. 후보 문헌 분포 (접근법 × {axis}, 중복 포함) — "
+                                                            "· 는 조사 표본에서 확인되지 않은 조합이며 연구가 없다는 뜻이 아님",
+                                                            n=c.fig(), axis=tr(c.axis["name"])), 15)
+    rpt.heading(tr("연구 방향 — 관찰된 접근과 가설"), 2)
     rpt.lead((c.s.get("leads") or {}).get("outlook", ""))
     for item in sorted(c.s["outlook"], key=lambda o: o.get("kind") != "관찰"):
-        rpt.bullet(f"[{item.get('kind', '')}] {keyword_tag(item, c.kw)}{item['text']}{cited(item)}")
+        rpt.bullet(f"[{tr(item.get('kind', ''))}] {keyword_tag(item, c.kw)}{item['text']}{cited(item)}")
 
 
 def sec_conclusion(rpt, c):
     """결론: 핵심 키워드마다 한 줄 판단 + 종합 (앞 장의 분야×키워드 표·쟁점을 요약). 예전 형식(kind)도 그대로 보임."""
     term = {k["id"]: k["term"] for k in c.kw}
     for p in c.s["conclusion"].get("points", []):
-        head = term.get(p.get("keyword")) or p.get("kind", "")
+        head = term.get(p.get("keyword")) or tr(p.get("kind", ""))
         rpt.bullet(f"{head}: {p['text']}{cited(p)}" if head else p["text"] + cited(p), emphasis=p.get("kind") == "한계")
     if c.s["conclusion"].get("closing"):
-        rpt.key_box("종합", [c.s["conclusion"]["closing"]], numbered=False)
+        rpt.key_box(tr("종합"), [c.s["conclusion"]["closing"]], numbered=False)
 
 
 def sec_appendix_next(rpt, c):
     """조사 과정 기록: 에이전트가 다음 단계(전문 분석)에서 볼 대상 — 독자용 읽기 목록이 아님. 한 문단 + 표 2개."""
     priority = c.s["conclusion"]["fulltext_priority"]
     done = sum(c.level_of.get(p["key"]) == "전문" for p in priority)
-    rpt.para(f"전문 분석 대상 {len(priority)}편 중 {done}편은 본문을 읽어 위 판단에 반영함" if done else
-             "초록 기반 조사이며, 아래 대상의 본문은 아직 분석하지 않음", 10)
+    rpt.para(tr("전문 분석 대상 {total}편 중 {n}편은 본문을 읽어 위 판단에 반영함", total=len(priority), n=done) if done else
+             tr("초록 기반 조사이며, 아래 대상의 본문은 아직 분석하지 않음"), 10)
     if c.s.get("next_steps"):
         rows = [split_head(i["text"]) for i in c.s["next_steps"]]
-        rpt.table(["다음 단계", "내용"], [[head, body + cited_short(i)] for (head, body), i in zip(rows, c.s["next_steps"])],
+        rpt.table([tr("다음 단계"), tr("내용")], [[head, body + cited_short(i)] for (head, body), i in zip(rows, c.s["next_steps"])],
                   [3.2, 13.3], size=9)
-    rpt.table(["인용 키", "선정 이유", "본문에서 볼 질문", "상태"],
+    rpt.table([tr("인용 키"), tr("선정 이유"), tr("본문에서 볼 질문"), tr("상태")],
               [[p["key"], p["reason"], "\n".join(p["questions"]),
-                "본문 반영" if c.level_of.get(p["key"]) == "전문" else f"전문 {fulltext_label(c.refs[p['key']])}"] for p in priority],
+                tr("본문 반영") if c.level_of.get(p["key"]) == "전문" else tr("전문 {status}", status=fulltext_label(c.refs[p["key"]]))]
+               for p in priority],
               [2.6, 5.8, 5.8, 2.3], size=8.5)
 
 
 def sec_appendix_excel(rpt, c):  # 안내 문장은 장 요지(leads)가 맡음 — 같은 말 반복 금지
-    rpt.table(["시트", "내용"], [[name, desc] for name, desc in EXCEL_SHEETS], [3.6, 12.9], size=9)
+    rpt.table([tr("시트"), tr("내용")], [[tr(name), tr(desc)] for name, desc in EXCEL_SHEETS], [3.6, 12.9], size=9)
 
 
 def sec_appendix_methods(rpt, c):
     role = role_of(c.s)
-    rpt.table(["인용 키", "역할·관련성", "검토", "해결 문제", "방법", "검증 근거", "구조물"],
-              [[m["key"], f"{role.get(m['key'], '')} · {c.refs[m['key']]['relevance']}점", c.level_of.get(m["key"], ""),
+    rpt.table([tr("인용 키"), tr("역할·관련성"), tr("검토"), tr("해결 문제"), tr("방법"), tr("검증 근거"), tr("구조물")],
+              [[m["key"], tr("{role} · {score}점", role=role.get(m["key"], ""), score=c.refs[m["key"]]["relevance"]), tr(c.level_of.get(m["key"], "")),
                 m.get("problem", ""), m["method"], m["validation"], m["structure"]] for m in c.s["method_comparison"]],
               [2.2, 1.6, 1.1, 3.2, 3.4, 3.2, 1.8], size=8)
 
 
 def sec_appendix_excluded(rpt, c):
     rows = excluded_rows(c.records, c.axis)
-    rpt.bullet(f"관련성 기준은 통과했지만 총점 미달·상한 초과로 빠진 {len(rows)}편 — 선정 편수 제한이 결론을 바꾸는지 확인하기 위한 표", emphasis=True)
-    rpt.table(["항목", "핵심논문", "선정 밖"], excluded_comparison(c.records, c.axis), [6.0, 2.5, 2.5], size=9)
+    rpt.bullet(tr("관련성 기준은 통과했지만 총점 미달·상한 초과로 빠진 {n}편 — 선정 편수 제한이 결론을 바꾸는지 확인하기 위한 표", n=len(rows)),
+               emphasis=True)
+    rpt.table([tr("항목"), tr("핵심논문"), tr("선정 밖")], excluded_comparison(c.records, c.axis), [6.0, 2.5, 2.5], size=9)
     if rows:
-        rpt.table(["순위", "제목", "연도", "종류", "인용", "관련성", "총점", c.axis["name"], "이유"], rows,
+        rpt.table([tr("순위"), tr("제목"), tr("연도"), tr("종류"), tr("인용"), tr("관련성"), tr("총점"), tr(c.axis["name"]), tr("이유")], rows,
                   [1.1, 5.4, 1.2, 1.5, 1.1, 1.3, 1.3, 2.3, 1.5], size=8)
 
 
 def sec_appendix_counts(rpt, c):
     claims = c.s.get("count_claims", [])
     if not claims:
-        rpt.bullet("편수 주장 근거가 기록되지 않음 (요약 형식 이전 버전)")
+        rpt.bullet(tr("편수 주장 근거가 기록되지 않음 (요약 형식 이전 버전)"))
         return
-    rpt.para("자동 집계 = 점수·분류 기록에서 계산 / 초록·전문 판독 = 요약 단계가 초록(본문을 읽은 논문은 본문)을 읽고 센 값 (해당 논문 키로 대조 가능)", 9)
-    rpt.table(["주장", "편수", "기준", "해당 논문"],
+    rpt.para(tr("자동 집계 = 점수·분류 기록에서 계산 / 초록·전문 판독 = 요약 단계가 초록(본문을 읽은 논문은 본문)을 읽고 센 값 (해당 논문 키로 대조 가능)"), 9)
+    rpt.table([tr("주장"), tr("편수"), tr("기준"), tr("해당 논문")],
               [[x["text"], x["count"], claim_basis(x, c.level_of), ", ".join(f"[{k}]" for k in x.get("keys", [])) or "—"] for x in claims],
               [6.0, 1.2, 1.9, 7.4], size=8)
 
 
 def sec_appendix_reviews(rpt, c):
-    rpt.table(["인용 키", "제목", "용도", "읽으면 좋은 이유"],
-              [[r["key"] + (" ★먼저" if r.get("core") else ""), c.refs[r["key"]]["title"], r.get("use", ""), r["why_read"]]
+    rpt.table([tr("인용 키"), tr("제목"), tr("용도"), tr("읽으면 좋은 이유")],
+              [[r["key"] + (tr(" ★먼저") if r.get("core") else ""), c.refs[r["key"]]["title"], tr(r.get("use", "")), r["why_read"]]
                for r in c.s["reviews_guide"]], [2.6, 6.2, 2.2, 5.5], size=8.5)
 
 
 def sec_appendix_adjacent(rpt, c):  # 주목할 인접 문헌 (사용자 결정 2026-10-16)
-    rpt.para(ADJACENT_NOTE, 9)
+    rpt.para(tr(ADJACENT_NOTE), 9)
     rows = adjacent_rows(c.s, c.refs)
     if not rows:
-        rpt.para("해당 문헌 없음 — 기준(관련성·영향 점수 하한)을 넘는 논문이 없거나 요약에 목록이 없음", 9)
+        rpt.para(tr("해당 문헌 없음 — 기준(관련성·영향 점수 하한)을 넘는 논문이 없거나 요약에 목록이 없음"), 9)
         return
-    rpt.table(["인용 키", "제목", "연도·실린 곳", "피인용", "관련성", "알아 둘 이유"], rows, [2.2, 5.0, 2.8, 1.2, 1.2, 4.1], size=8.5)
+    rpt.table([tr("인용 키"), tr("제목"), tr("연도·실린 곳"), tr("피인용"), tr("관련성"), tr("알아 둘 이유")], rows,
+              [2.2, 5.0, 2.8, 1.2, 1.2, 4.1], size=8.5)
 
 
-def sec_appendix_data(rpt, c):
-    rows = [[d["name"], d.get("kind") or "", d.get("access") or "접근 미확인", d.get("link") or "—", "\n".join(d.get("used_by", []))]
+def sec_appendix_data(rpt, c):  # 종류·접근 상태는 지침이 정한 말(synthesis_guide) — 보일 때 tr
+    rows = [[d["name"], tr(d.get("kind") or ""), tr(d.get("access") or "접근 미확인"), d.get("link") or "—", "\n".join(d.get("used_by", []))]
             for d in c.s.get("datasets_benchmarks", [])]
     if rows:
-        rpt.para("접근 상태: 공개 접근 확인 = 링크 확인됨 / 논문 언급만 = 논문이 사용했다고만 밝힘 (바로 받을 수 있다는 뜻이 아님)", 9)
-        rpt.table(["이름", "종류", "접근 상태", "링크", "사용 논문"], rows, [4.8, 2.4, 2.4, 3.6, 3.3], size=8.5)
+        rpt.para(tr("접근 상태: 공개 접근 확인 = 링크 확인됨 / 논문 언급만 = 논문이 사용했다고만 밝힘 (바로 받을 수 있다는 뜻이 아님)"), 9)
+        rpt.table([tr("이름"), tr("종류"), tr("접근 상태"), tr("링크"), tr("사용 논문")], rows, [4.8, 2.4, 2.4, 3.6, 3.3], size=8.5)
     else:
-        rpt.bullet("초록에서 확인된 데이터·벤치마크 없음")
+        rpt.bullet(tr("초록에서 확인된 데이터·벤치마크 없음"))
 
 
 def sec_appendix_terms(rpt, c):
@@ -479,7 +485,7 @@ def sec_appendix_terms(rpt, c):
         rpt.bullet(f"{t['name']}: {t['description']}{cite(t)}")
     abbreviations = c.s.get("abbreviations") or {}
     if abbreviations:
-        rpt.table(["약어", "정식 명칭"], [[a, f] for a, f in abbreviations.items()], [3.0, 13.5], size=9)
+        rpt.table([tr("약어"), tr("정식 명칭")], [[a, f] for a, f in abbreviations.items()], [3.0, 13.5], size=9)
 
 
 def sec_references(rpt, c):
@@ -493,27 +499,27 @@ def sec_references(rpt, c):
             rpt.run(p, text, 9).italic = italic
 
 
-SECTIONS = {  # id → (제목, 함수, 종류: main = 번호 / appendix = 부록 문자 / plain = 번호 없음)
-    "summary": ("핵심 인사이트", sec_summary, "main"),
-    "landscape": ("연구 접근과 문헌 분포", sec_landscape, "main"),
-    "subtopics": ("분야별 대표 연구", sec_subtopics, "main"),
-    "issues": ("후속 검토 쟁점", sec_issues, "main"),
-    "conclusion": ("결론", sec_conclusion, "main"),
-    "appendix_purpose": ("조사 목적과 범위", sec_purpose, "appendix"),
-    "appendix_method": ("검색·선정 방법과 한계", sec_method, "appendix"),
-    "appendix_next": ("다음 단계 — 전문 분석 대상", sec_appendix_next, "appendix"),
+SECTIONS = {  # id → (제목 — 쓰는 곳에서 tr, 함수, 종류: main = 번호 / appendix = 부록 문자 / plain = 번호 없음)
+    "summary": (tr_later("핵심 인사이트"), sec_summary, "main"),
+    "landscape": (tr_later("연구 접근과 문헌 분포"), sec_landscape, "main"),
+    "subtopics": (tr_later("분야별 대표 연구"), sec_subtopics, "main"),
+    "issues": (tr_later("후속 검토 쟁점"), sec_issues, "main"),
+    "conclusion": (tr_later("결론"), sec_conclusion, "main"),
+    "appendix_purpose": (tr_later("조사 목적과 범위"), sec_purpose, "appendix"),
+    "appendix_method": (tr_later("검색·선정 방법과 한계"), sec_method, "appendix"),
+    "appendix_next": (tr_later("다음 단계 — 전문 분석 대상"), sec_appendix_next, "appendix"),
     # 예전 장 id (개인 설정에서 다시 켤 수 있음)
-    "purpose": ("조사 목적과 범위", sec_purpose, "main"),
-    "method": ("검색·선정 방법과 한계", sec_method, "main"),
-    "appendix_excel": ("상세 자료 안내 (05_references.xlsx)", sec_appendix_excel, "appendix"),
-    "appendix_methods": ("핵심논문 비교표", sec_appendix_methods, "appendix"),
-    "appendix_excluded": ("선정 밖 문헌 점검표", sec_appendix_excluded, "appendix"),
-    "appendix_counts": ("집계 근거표 — 본문 편수의 출처", sec_appendix_counts, "appendix"),
-    "appendix_reviews": ("문헌조사논문 (핵심논문과 별도)", sec_appendix_reviews, "appendix"),
-    "appendix_adjacent": ("주목할 인접 문헌 (핵심논문과 별도)", sec_appendix_adjacent, "appendix"),
-    "appendix_data": ("데이터·벤치마크", sec_appendix_data, "appendix"),
-    "appendix_terms": ("기법·용어", sec_appendix_terms, "appendix"),
-    "references": ("참고문헌", sec_references, "plain"),
+    "purpose": (tr_later("조사 목적과 범위"), sec_purpose, "main"),
+    "method": (tr_later("검색·선정 방법과 한계"), sec_method, "main"),
+    "appendix_excel": (tr_later("상세 자료 안내 (05_references.xlsx)"), sec_appendix_excel, "appendix"),
+    "appendix_methods": (tr_later("핵심논문 비교표"), sec_appendix_methods, "appendix"),
+    "appendix_excluded": (tr_later("선정 밖 문헌 점검표"), sec_appendix_excluded, "appendix"),
+    "appendix_counts": (tr_later("집계 근거표 — 본문 편수의 출처"), sec_appendix_counts, "appendix"),
+    "appendix_reviews": (tr_later("문헌조사논문 (핵심논문과 별도)"), sec_appendix_reviews, "appendix"),
+    "appendix_adjacent": (tr_later("주목할 인접 문헌 (핵심논문과 별도)"), sec_appendix_adjacent, "appendix"),
+    "appendix_data": (tr_later("데이터·벤치마크"), sec_appendix_data, "appendix"),
+    "appendix_terms": (tr_later("기법·용어"), sec_appendix_terms, "appendix"),
+    "references": (tr_later("참고문헌"), sec_references, "plain"),
 }
 
 
@@ -545,23 +551,25 @@ def build(run_dir: Path, variant: str) -> Path:
     rpt.tech = tech_keywords(s)  # 기술 핵심어 초록색 (사용자 피드백 2026-10-19)
     years = sorted({r["year"] for r in c.records})
 
-    rpt.para("ALT 문헌조사 보고서", 12, True, NAVY, WD_ALIGN_PARAGRAPH.CENTER, mark=False)
+    rpt.para(tr("ALT 문헌조사 보고서"), 12, True, NAVY, WD_ALIGN_PARAGRAPH.CENTER, mark=False)
     rpt.para(report_title(run_dir, s, c.refs), 18, True, NAVY, WD_ALIGN_PARAGRAPH.CENTER, mark=False)
-    rpt.para(f"대상 출판 {years[0]}–{years[-1]} · 검색일 {c.meta['run_at'][:10]} · 후보 {p['screened']}편 → 핵심논문 {p['selected']}편 "
-             f"+ 문헌조사논문 {p['reviews_listed']}편", 10, False, None, WD_ALIGN_PARAGRAPH.CENTER)
+    rpt.para(tr("대상 출판 {start}–{end} · 검색일 {date} · 후보 {screened}편 → 핵심논문 {selected}편 + 문헌조사논문 {n}편",
+                start=years[0], end=years[-1], date=c.meta["run_at"][:10], screened=p["screened"], selected=p["selected"],
+                n=p["reviews_listed"]), 10, False, None, WD_ALIGN_PARAGRAPH.CENTER)
     rpt.para(c.review_line, 10, True, RED, WD_ALIGN_PARAGRAPH.CENTER)
-    rpt.para("[ ] 안은 근거 문헌의 인용 키 (참고문헌·05_references.xlsx와 같음), [일반 개념]은 교과서 수준 지식",
+    rpt.para(tr("[ ] 안은 근거 문헌의 인용 키 (참고문헌·05_references.xlsx와 같음), [일반 개념]은 교과서 수준 지식"),
              9, False, None, WD_ALIGN_PARAGRAPH.CENTER)
 
     appendix = 0
     for sid in sections("report", run_dir):
         title, fn, kind = SECTIONS[sid]
+        title = tr(title)
         if kind == "main":
             c.number += 1
             rpt.heading(f"{c.number}. {title}")
         elif kind == "appendix":
             appendix += 1
-            rpt.heading(f"부록 {chr(64 + appendix)}. {title}")
+            rpt.heading(tr("부록 {letter}. {title}", letter=chr(64 + appendix), title=title))
         else:
             rpt.heading(title)
         rpt.lead((s.get("leads") or {}).get(sid, ""))
@@ -577,6 +585,7 @@ def main() -> None:
     parser.add_argument("run_dir", type=Path)
     add_variant(parser)
     args = parser.parse_args()
+    use_language(args.run_dir)
     print(f"[docx] {build(args.run_dir, args.variant).name}")
 
 

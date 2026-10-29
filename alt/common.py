@@ -39,6 +39,69 @@ def load_config() -> dict:
     return yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8"))
 
 
+LANGUAGES = ("ko", "en")  # 결과물 언어 (사용자 결정 2026-10-29 — 한국어·영어, 다른 언어는 alt/lang/<언어>.yaml을 더하면 됨)
+LANG_DIR = PACKAGE_DIR / "lang"
+_output_language = {"code": "ko"}
+
+
+def run_language(run_dir: Path | None) -> str:
+    """조사의 결과물 언어: topic.json `language` → config output.default_language (기록 없는 예전 조사는 한국어)."""
+    return (load_topic(run_dir).get("language") if run_dir else None) or load_config()["output"]["default_language"]
+
+
+def use_language(run_dir: Path | None) -> str:
+    """결과물을 만드는 스크립트가 시작할 때 부른다 — 이후 tr()이 이 언어로 바꾼다."""
+    _output_language["code"] = run_language(run_dir)
+    return _output_language["code"]
+
+
+def output_language() -> str:
+    return _output_language["code"]
+
+
+def language_table(code: str) -> dict:
+    path = LANG_DIR / f"{code}.yaml"
+    return (yaml.safe_load(path.read_text(encoding="utf-8")) or {}) if path.is_file() else {}
+
+
+_tables: dict[str, dict] = {}
+
+
+def tr(text: str, /, **values) -> str:
+    """결과물 고정 문구: 코드에는 한국어 원문을 쓰고, 결과물 언어가 한국어가 아니면 alt/lang/<언어>.yaml에서 찾는다.
+    {이름} 자리는 values로 채운다. 대응표 값이 {one, other}면 values의 n이 1일 때 one (영어 단수·복수).
+    대응표에 없으면 원문 그대로 — 빠진 번역은 tests/test_language.py가 잡는다."""
+    code = _output_language["code"]
+    if code != "ko":
+        entry = _tables.setdefault(code, language_table(code)).get(text, text)
+        text = entry if isinstance(entry, str) else entry["one" if values.get("n") == 1 else "other"]
+    return text.format(**values) if values else text
+
+
+def tr_stored(text: str) -> str:
+    """기록에 이미 채워져 저장된 문구(예: 채점 표시 '공지: retraction')를 결과물 언어로 — 그대로 맞는 항목이 없으면
+    자리표시가 있는 원문 틀(tr_later로 표시한 것)에 맞춰 보고 채운 값을 옮긴다. 어디에도 안 맞으면 그대로."""
+    if _output_language["code"] == "ko" or not text:
+        return text
+    table = _tables.setdefault(_output_language["code"], language_table(_output_language["code"]))
+    if text in table:
+        return tr(text)
+    for template in table:
+        if "{" in template:
+            names = re.findall(r"\{(\w+)\}", template)
+            pattern = "".join(f"(?P<{part}>.+?)" if i % 2 else re.escape(part)
+                              for i, part in enumerate(re.split(r"\{(\w+)\}", template)))
+            match = re.fullmatch(pattern, text) if names and len(names) == len(set(names)) else None
+            if match:
+                return tr(template, **match.groupdict())
+    return text
+
+
+def tr_later(text: str) -> str:
+    """모듈 상수의 결과물 문구 표시만 (언어는 실행 때 정해지므로 쓰는 곳에서 tr) — 번역 누락 시험이 찾게."""
+    return text
+
+
 def load_project_settings(run_dir: Path | None) -> dict:
     """이 조사 맞춤 설정 `<run>/project/settings.yaml` (장 목록·선정 기준). 없으면 빈 dict."""
     path = Path(run_dir) / PROJECT_SUBDIR / "settings.yaml" if run_dir else None
@@ -98,7 +161,7 @@ def scoring_config(run_dir: Path | None = None) -> tuple[dict, list[dict]]:
 def role_label(subtopic: dict, s: dict | None = None) -> str:
     """분야 역할 표시 이름 — 주제마다 synthesis role_names, 없으면 config output.role_labels ('핵심'이 '핵심논문'과 헷갈리지 않게)."""
     role = subtopic.get("role", "")
-    return ((s or {}).get("role_names") or {}).get(role) or load_config()["output"].get("role_labels", {}).get(role, role)
+    return ((s or {}).get("role_names") or {}).get(role) or tr(load_config()["output"].get("role_labels", {}).get(role, role))
 
 
 def load_topic(run_dir: Path) -> dict:
@@ -124,7 +187,9 @@ def verbatim_strings(run_dir: Path) -> list[str]:
     바꾸면 안 되는 글이라 용어 검사(변이형)·약어 풀이에서 뺀다 (10-16 결함: 검색어가 변이형으로 잡힘, 입력 원문 약어를 풀어 씀)."""
     candidates, topic = Path(run_dir) / "candidates.json", load_topic(run_dir)
     queries = read_json(candidates).get("meta", {}).get("queries", []) if candidates.is_file() else []
-    return [*queries, topic.get("input", ""), topic.get("scope_reason", ""), *(x["reason"] for x in topic.get("split_out", [])),
+    refs_path = Path(run_dir) / "references.json"  # 논문 제목·학술지 이름도 원문 그대로 (2026-10-29: 참고문헌 제목의 SHAP에 풀이가 붙음)
+    refs = read_json(refs_path).values() if refs_path.is_file() else []
+    return [*queries, *(r.get(k) or "" for r in refs for k in ("title", "venue")), topic.get("input", ""), topic.get("scope_reason", ""), *(x["reason"] for x in topic.get("split_out", [])),
             *(f"{x['q']} → {x['a']}" for x in topic.get("clarifications", []))]  # 해석 확인 질의응답도 사용자 말 그대로
 
 
@@ -132,7 +197,8 @@ def topic_context(run_dir: Path, topic: str | None = None, approach: str | None 
     """채점·평가·검증 입력에 넣는 주제 — 확정 주제(topic.json)의 영문명·포함·제외 범위, 없으면 받은 값.
     기준 문서(relevance_rubric·review_rubric)는 주제 중립이므로 판단 대상은 늘 이 값으로 준다 (2026-10-16 결함 수정)."""
     confirmed = load_topic(run_dir)
-    context = {"topic": confirmed.get("topic_en") or topic, "approach": confirmed.get("approach_en") or approach}
+    context = {"topic": confirmed.get("topic_en") or topic, "approach": confirmed.get("approach_en") or approach,
+               "language": run_language(run_dir)}  # AI가 쓰는 이유 글의 언어 (결과물 언어)
     if confirmed:
         context["scope"] = {k: confirmed[k] for k in ("include", "exclude", "question")}
     return context
@@ -141,11 +207,19 @@ def topic_context(run_dir: Path, topic: str | None = None, approach: str | None 
 def display_names(run_dir: Path, s: dict, meta: dict) -> dict:
     """결과물에 쓰는 주제·접근법 이름 — '선택한 접근법' 같은 자리표시 말 대신 쓴다.
     확정 주제(topic.json) → 요약 names → 입력 주제·접근법(접근법은 config approach_labels 표시 이름) 순."""
-    topic, names = load_topic(run_dir), s.get("names") or {}
+    topic, names = topic_names(load_topic(run_dir)), s.get("names") or {}
     raw = meta.get("approach") or ""
-    return {"topic": topic.get("topic_ko") or names.get("topic") or meta.get("topic") or "",
-            "approach": topic.get("approach_ko") or names.get("approach")
-            or load_config()["output"]["approach_labels"].get(raw.lower(), raw)}
+    return {"topic": topic.get("topic") or names.get("topic") or meta.get("topic") or "",
+            "approach": topic.get("approach") or names.get("approach")
+            or tr(load_config()["output"]["approach_labels"].get(raw.lower(), raw))}
+
+
+def topic_names(t: dict) -> dict:
+    """확정 주제의 결과물 언어 이름 — 한국어면 topic_ko·approach_ko, 그 밖은 영문 이름 (topic.json에 둘 다 있음)."""
+    if not t:
+        return {}
+    ko = output_language() == "ko"
+    return {"topic": t["topic_ko"] if ko else t["topic_en"], "approach": t["approach_ko"] if ko else t["approach_en"]}
 
 
 def year_span(years: list[int]) -> str:
@@ -166,8 +240,10 @@ def topic_line(run_dir: Path, references: dict | None = None) -> str:
     if not t:
         return ""
     held = year_span(sorted({r["year"] for r in (references or {}).values() if r.get("year")}))
-    return (f"조사 주제: {t['topic_ko']} ({t['topic_en']}) · 접근법: {t['approach_ko']} · 기간 {scope_years(t)}"
-            + (f" (핵심논문 수록 {held})" if held and held != scope_years(t) else ""))
+    names = topic_names(t)
+    topic = f"{t['topic_ko']} ({t['topic_en']})" if output_language() == "ko" else t["topic_en"]
+    return (tr("조사 주제: {topic} · 접근법: {approach} · 기간 {years}", topic=topic, approach=names["approach"], years=scope_years(t))
+            + (tr(" (핵심논문 수록 {held})", held=held) if held and held != scope_years(t) else ""))
 
 
 def scope_history(run_dir: Path) -> list[tuple[str, str]]:
@@ -176,13 +252,13 @@ def scope_history(run_dir: Path) -> list[tuple[str, str]]:
     t = load_topic(run_dir)
     if not t or not (t.get("scope_reason") or t.get("split_out") or t.get("parent_run") or t.get("clarifications")):
         return []
-    rows = [("입력 원문", t["input"])]
-    rows += [("해석 확인", f"{x['q']} → {x['a']}") for x in t.get("clarifications", [])]  # 모호한 점 질의응답 (사용자 결정 2026-10-21)
+    rows = [(tr("입력 원문"), t["input"])]
+    rows += [(tr("해석 확인"), f"{x['q']} → {x['a']}") for x in t.get("clarifications", [])]  # 모호한 점 질의응답 (사용자 결정 2026-10-21)
     if t.get("parent_run"):  # 세부 조사: 어느 조사에서 떼어 냈는지 (SKILL ⑧-1 — 결과 폴더 이름 그대로)
-        rows.append(("상위 조사", f"{t['parent_run']} — 이 조사는 그 조사의 한 분야를 따로 떼어 깊이 본 세부 조사"))
+        rows.append((tr("상위 조사"), tr("{run} — 이 조사는 그 조사의 한 분야를 따로 떼어 깊이 본 세부 조사", run=t["parent_run"])))
     if t.get("scope_reason"):
-        rows.append(("범위 결정", t["scope_reason"]))
-    rows += [("세부 조사로 분리", f"{x['field']} — {x['reason']}" + (f" → 결과 폴더 {x['run']}" if x.get("run") and x["run"] not in x["reason"] else ""))  # 이유에 이미 있으면 다시 붙이지 않음
+        rows.append((tr("범위 결정"), t["scope_reason"]))
+    rows += [(tr("세부 조사로 분리"), f"{x['field']} — {x['reason']}" + (tr(" → 결과 폴더 {run}", run=x["run"]) if x.get("run") and x["run"] not in x["reason"] else ""))  # 이유에 이미 있으면 다시 붙이지 않음
              for x in t.get("split_out", [])]
     return rows
 
@@ -193,8 +269,11 @@ def report_title(run_dir: Path, s: dict, references: dict) -> str:
     topic = load_topic(run_dir)
     if not topic:
         return s["title"]
-    approach = "" if topic["approach_ko"] in topic["topic_ko"] else f"{topic['approach_ko']} "
-    return f"{topic['topic_ko']} — {approach}연구 동향 ({scope_years(topic)})"
+    names = topic_names(topic)
+    same = (lambda a, b: a in b) if output_language() == "ko" else (lambda a, b: a.lower() in b.lower())  # 한국어는 예전처럼 대소문자 구분
+    if same(names["approach"], names["topic"]):
+        return tr("{topic} — 연구 동향 ({years})", topic=names["topic"], years=scope_years(topic))
+    return tr("{topic} — {approach} 연구 동향 ({years})", topic=names["topic"], approach=names["approach"], years=scope_years(topic))
 
 
 def load_user_style(run_dir: Path | None = None) -> str:
@@ -276,7 +355,7 @@ def cite(item: dict, limit: int | None = None, with_pages: bool = True) -> str:
     pages = (item.get("pages") or {}) if with_pages else {}
     if keys:
         shown = keys if limit is None else keys[:limit]
-        more = f" 외 {len(keys) - len(shown)}편" if len(keys) > len(shown) else ""
+        more = tr(" 외 {n}편", n=len(keys) - len(shown)) if len(keys) > len(shown) else ""
         return " [" + "; ".join(f"{k}, p.{pages[k]}" if k in pages else k for k in shown) + more + "]"
     source = item.get("source")
     return f" [{source}]" if source else ""
@@ -401,14 +480,14 @@ def axis_labels(axis: dict) -> list[str]:
     return [g[0] for g in axis["groups"]]
 
 
-PRISMA_NOTE = [  # 문헌 선별 흐름도 설명 '머리말: 설명' — 보고서 부록·배경학습 공용 (사용자 지시 2026-10-15).
+PRISMA_NOTE = [  # 쓰는 곳에서 tr — 문헌 선별 흐름도 설명 '머리말: 설명' — 보고서 부록·배경학습 공용 (사용자 지시 2026-10-15).
     # 약어 자동 풀이와 겹치지 않게 PRISMA는 정식 명칭과 함께 설명 쪽에 처음 쓴다
-    "이름: PRISMA(Preferred Reporting Items for Systematic Reviews and Meta-Analyses) 흐름도",
-    "원래 쓰는 곳: 의학·보건학·사회과학 등의 체계적 문헌고찰(Systematic Review)과 메타분석(Meta-Analysis)",
-    "하는 일: 논문을 어떻게 검색하고 최종 선정했는지 그 과정을 투명하게 보여 주는 표준 순서도",
+    tr_later("이름: PRISMA(Preferred Reporting Items for Systematic Reviews and Meta-Analyses) 흐름도"),
+    tr_later("원래 쓰는 곳: 의학·보건학·사회과학 등의 체계적 문헌고찰(Systematic Review)과 메타분석(Meta-Analysis)"),
+    tr_later("하는 일: 논문을 어떻게 검색하고 최종 선정했는지 그 과정을 투명하게 보여 주는 표준 순서도"),
     # 무엇을 안 했는지 밝힘 (사용자 지시 2026-10-16: '형식만 참조'는 핵심 절차를 건너뛴 듯한 오해)
-    "이 조사에서는: 선별 과정을 PRISMA 흐름도 양식으로 표시함 — 체계적 문헌고찰의 나머지 절차(사전 등록, "
-    "연구별 비뚤림 위험 평가, 메타분석)는 하지 않은 연구 동향 조사임",
+    tr_later("이 조사에서는: 선별 과정을 PRISMA 흐름도 양식으로 표시함 — 체계적 문헌고찰의 나머지 절차(사전 등록, "
+             "연구별 비뚤림 위험 평가, 메타분석)는 하지 않은 연구 동향 조사임"),
 ]
 RELEVANCE_PASSED = ("selected", "below_threshold", "over_limit")  # 관련성 하한은 넘은 연구 논문 (총점과 무관)
 
@@ -456,9 +535,9 @@ def review_info(run_dir: Path, variant: str) -> tuple[str, dict[str, str]]:
     """요약 단계가 실제로 읽은 수준 (synthesis_input_<판>.json 기준) → (산출물에 쓸 한 줄, {키: 전문/초록/제목만})."""
     data = read_json(Path(run_dir) / variant_name("synthesis_input.json", variant))
     level_of = {p["key"]: p.get("review_level", "초록" if p.get("abstract") else "제목만") for p in data["papers"]}
-    counts = {lv: sum(v == lv for v in level_of.values()) for lv in ("전문", "초록", "제목만")}
+    counts = {lv: sum(v == lv for v in level_of.values()) for lv in ("전문", "초록", "제목만")}  # 값은 기록용 코드 — 보일 때 tr
     mode = data["meta"].get("reading_mode", "abstract")
-    counted = f"전체 {len(level_of)}편 중 " + " · ".join(f"{lv} {n}편" for lv, n in counts.items() if n)
-    line = (f"검토 수준: {counted} (전문 모드 — 받아 둔 본문을 읽고 정리)" if mode == "full"
-            else f"검토 수준: {counted} (초록 모드 — 수치·검증 내용은 원문 확인 필요)")
+    counted = tr("전체 {total}편 중 ", total=len(level_of)) + " · ".join(tr("{level} {n}편", level=tr(lv), n=n) for lv, n in counts.items() if n)
+    line = (tr("검토 수준: {counted} (전문 모드 — 받아 둔 본문을 읽고 정리)", counted=counted) if mode == "full"
+            else tr("검토 수준: {counted} (초록 모드 — 수치·검증 내용은 원문 확인 필요)", counted=counted))
     return line, level_of

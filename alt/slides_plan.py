@@ -15,7 +15,7 @@ from pptx import Presentation
 from pptx.util import Emu
 
 from check_citations import cited_keys
-from common import PROJECT_DIR, load_config
+from common import PROJECT_DIR, load_config, tr, tr_later
 
 PT_CM = 0.0353
 LATIN_WIDTH = 0.55        # 영문·숫자 한 글자 폭 (한글 = 1)
@@ -158,7 +158,8 @@ def figure_choices(run_dir: Path, synthesis: dict) -> list[dict]:
 
 def figure_sources(synthesis: dict) -> dict:
     """원문 그림 파일 → 그림 아래 출처 줄."""
-    return {fig["file"]: f"출처: {fig['key']}, {fig['fig']} (p.{fig['page']})" for fig in synthesis.get("figures", [])}
+    return {fig["file"]: tr("출처: {key}, {fig} (p.{page})", key=fig["key"], fig=fig["fig"], page=fig["page"])
+            for fig in synthesis.get("figures", [])}
 
 
 SLIDES_FILE = "slides.json"
@@ -166,7 +167,7 @@ INPUT_FILE = "slides_input.json"
 # 발표 종류 → (구성안 입력, 구성안) — 01_background도 같은 방식으로 다시 씀 (사용자 결정 2026-10-21)
 DECK_FILES = {"talk": (INPUT_FILE, SLIDES_FILE), "learn": ("slides_learn_input.json", "slides_learn.json")}
 # 배경학습 마지막 장 구분 — 용어 표·읽는 법은 코드가 붙임 (사용자 결정 2026-10-21: 용어는 양식 표 장에, 읽는 법은 지금 그림 그대로)
-LEARN_TAIL = ["용어와 읽는 법", "용어 풀이와 결과물 읽는 법"]
+LEARN_TAIL = [tr_later("용어와 읽는 법"), tr_later("용어 풀이와 결과물 읽는 법")]  # 쓰는 곳에서 tr
 LEARN_SECTIONS = 5   # 구성안이 쓰는 장 구분 수 — 목차 6번째는 LEARN_TAIL
 
 
@@ -174,10 +175,11 @@ def check_learn_plan(plan: dict) -> list[str]:
     """배경학습 구성안 추가 검사: 장 구분 5개, 목차 6번째 = 코드가 붙이는 마지막 장."""
     errors = []
     slides = plan.get("slides") or []
+    tail = tr(LEARN_TAIL[0])  # 결과물 언어의 장 이름
     n = sum(spec.get("type") == "section" for spec in slides)
     if n != LEARN_SECTIONS:
-        errors.append(f"장 구분 {n}개 — 배경학습은 {LEARN_SECTIONS}개 (6번째 '{LEARN_TAIL[0]}'는 코드가 붙임)")
+        errors.append(f"장 구분 {n}개 — 배경학습은 {LEARN_SECTIONS}개 (6번째 '{tail}'는 코드가 붙임)")
     contents = next((spec for spec in slides if spec.get("type") == "contents"), None)
-    if contents is None or (contents.get("slots", {}).get("item6") or [""])[0] != LEARN_TAIL[0]:
-        errors.append(f"목차 item6의 장 이름은 '{LEARN_TAIL[0]}'여야 함")
+    if contents is None or (contents.get("slots", {}).get("item6") or [""])[0] != tail:
+        errors.append(f"목차 item6의 장 이름은 '{tail}'여야 함")
     return errors

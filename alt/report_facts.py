@@ -4,10 +4,13 @@ from __future__ import annotations
 
 from collections import Counter
 
-from common import axis_group, axis_labels, role_label
+from common import axis_group, axis_labels, role_label, tr, tr_later
 
-CATEGORY_LABEL = {"journal": "저널", "conference": "학회", "preprint": "프리프린트", "other": "기타", "institution": "기관·선급"}
-PDF_SOURCE_LABEL = {"downloaded": "자동", "manual": "수동", "manual_needed": "직접 받기 필요", "not_oa": "무료 공개 아님"}
+# 값은 한국어 원문 그대로 (표시하는 곳에서 tr)
+CATEGORY_LABEL = {"journal": tr_later("저널"), "conference": tr_later("학회"), "preprint": tr_later("프리프린트"),
+                  "other": tr_later("기타"), "institution": tr_later("기관·선급")}
+PDF_SOURCE_LABEL = {"downloaded": tr_later("자동"), "manual": tr_later("수동"), "manual_needed": tr_later("직접 받기 필요"),
+                    "not_oa": tr_later("무료 공개 아님")}
 
 
 NAME_PARTICLES = {"van", "von", "de", "der", "den", "da", "di", "du", "la", "le", "dos", "das", "del", "della", "ten", "ter"}
@@ -67,7 +70,7 @@ def apa_sort_key(item: tuple[str, dict]) -> tuple:
 
 def fulltext_label(ref: dict) -> str:
     """전문 확보 상태: '✓ 자동' / '✓ 수동' / '직접 받기 필요' / '무료 공개 아님'."""
-    return ("✓ " if ref.get("pdf_file") else "") + PDF_SOURCE_LABEL.get(ref.get("pdf_status"), "미확인")
+    return ("✓ " if ref.get("pdf_file") else "") + tr(PDF_SOURCE_LABEL.get(ref.get("pdf_status"), tr_later("미확인")))
 
 
 def role_of(s: dict) -> dict[str, str]:
@@ -95,89 +98,105 @@ def method_lines(meta: dict, records: list[dict], rules: dict, level_of: dict[st
     # 검증 문구는 실제 수행한 만큼만 (생략·미확인을 완료로 쓰지 않음 — Codex 검토 2026-10-28)
     verified = sum(bool(r.get("verified")) for r in records)
     evaluators = meta.get("review_evaluators")  # 없으면 이 값을 기록하기 전 조사
-    review_judged = ("'본문 기여' 기준으로 AI 2개가 평가해 둘 다 통과한" if evaluators and evaluators >= 2
-                     else "'본문 기여' 기준으로 AI 1개가 평가해 통과한 (독립 평가 생략)" if evaluators == 1
-                     else "'본문 기여' 평가 없이 관련성 기준으로 고른" if evaluators == 0
-                     else "관련성 기준을 넘고 목록에 오른 (본문 기여 평가 여부는 기록 없음)")
+    review_judged = (tr("'본문 기여' 기준으로 AI 2개가 평가해 둘 다 통과한") if evaluators and evaluators >= 2
+                     else tr("'본문 기여' 기준으로 AI 1개가 평가해 통과한 (독립 평가 생략)") if evaluators == 1
+                     else tr("'본문 기여' 평가 없이 관련성 기준으로 고른") if evaluators == 0
+                     else tr("관련성 기준을 넘고 목록에 오른 (본문 기여 평가 여부는 기록 없음)"))
     # '머리말: 설명' 한 줄씩 (보고서에서 머리말을 굵게 표시). 검색어는 누가 무엇에서 만들었는지와 원문까지 (사용자 피드백 2026-10-15)
-    asked = (f"입력 원문 '{topic['input']}' → 확정 주제 '{topic['topic_en']}' · 접근법 '{topic['approach_en']}'" if topic
-             else f"입력 주제 '{meta['topic']}' · 접근법 '{meta['approach']}'" if meta.get("topic") and meta.get("approach")
-             else "입력 주제·접근법")
+    asked = (tr("입력 원문 '{input}' → 확정 주제 '{topic}' · 접근법 '{approach}'",
+                input=topic["input"], topic=topic["topic_en"], approach=topic["approach_en"]) if topic
+             else tr("입력 주제 '{topic}' · 접근법 '{approach}'", topic=meta["topic"], approach=meta["approach"])
+             if meta.get("topic") and meta.get("approach")
+             else tr("입력 주제·접근법"))
     confirmed = bool(topic) and topic.get("queries") == meta["queries"]  # 주제 확정 때 사용자가 확인한 검색어 그대로 (사용자 결정 2026-10-21)
+    query_list = " / ".join(f"'{q}'" for q in meta["queries"])
+    cocited_added = (meta.get("cocited") or {}).get("added_total", 0)
+    outside_uncited = sum(r["status"] in OUTSIDE and r["cited_by_count"] == 0 for r in records)
     lines = [
-        (f"검색어: {asked}을 바탕으로 {'AI가 만들고 사용자가 확인한' if confirmed else 'AI가 만든'} 영어 검색어 {len(meta['queries'])}개 — "
-         + " / ".join(f"'{q}'" for q in meta["queries"]), False),
-        (f"검색: {meta['run_at'][:10]}, OpenAlex — 출판 {meta['years']} 조건, 실제 후보는 "
-         + "·".join(f"{y}년 {n}편" for y, n in sorted(years.items()))
-         + (f" ({', '.join(map(str, missing))}년 없음)" if missing else ""), False),
-        *([(f"공통 인용 고전: 관련성 {c['min_relevance']}점 이상 후보 {c['base']}편 중 {c['threshold']}편 이상이 함께 인용한 "
-             f"검색 밖 문헌 {c['added_total']}편을 더해 같은 기준으로 채점 (기간 밖 {c['out_of_period']}편은 제외) → 관련성 통과 "
-             f"{p.get('cocited_listed', 0)}편을 핵심논문과 따로 목록에 둠 (엑셀 '공통 인용 고전') — 초록 없는 고전이 검색에서 빠지는 한계 보완",
+        ((tr("검색어: {asked}을 바탕으로 AI가 만들고 사용자가 확인한 영어 검색어 {n}개 — {queries}",
+             asked=asked, n=len(meta["queries"]), queries=query_list) if confirmed
+          else tr("검색어: {asked}을 바탕으로 AI가 만든 영어 검색어 {n}개 — {queries}",
+                  asked=asked, n=len(meta["queries"]), queries=query_list)), False),
+        (tr("검색: {date}, OpenAlex — 출판 {years} 조건, 실제 후보는 {by_year}", date=meta["run_at"][:10], years=meta["years"],
+            by_year="·".join(tr("{year}년 {n}편", year=y, n=n) for y, n in sorted(years.items())))
+         + (tr(" ({years}년 없음)", years=", ".join(map(str, missing))) if missing else ""), False),
+        *([(tr("공통 인용 고전: 관련성 {min_relevance}점 이상 후보 {base}편 중 {threshold}편 이상이 함께 인용한 "
+               "검색 밖 문헌 {added}편을 더해 같은 기준으로 채점 (기간 밖 {out_of_period}편은 제외) → 관련성 통과 "
+               "{listed}편을 핵심논문과 따로 목록에 둠 (엑셀 '공통 인용 고전') — 초록 없는 고전이 검색에서 빠지는 한계 보완",
+               min_relevance=c["min_relevance"], base=c["base"], threshold=c["threshold"], added=c["added_total"],
+               out_of_period=c["out_of_period"], listed=p.get("cocited_listed", 0)),
              False)] if (c := meta.get("cocited")) and c.get("added_total") else []),
-        *([(f"초록 없는 후보: 인용 백분위가 낮은 {no_abstract}편은 제외, 높은 논문은 제목으로 채점하고 '전문 확인 필요' 표시", False)]
+        *([(tr("초록 없는 후보: 인용 백분위가 낮은 {n}편은 제외, 높은 논문은 제목으로 채점하고 '전문 확인 필요' 표시", n=no_abstract), False)]
           if no_abstract else []),
-        (f"핵심논문 선정: 후보 {p['screened']}편 → 연구 논문 {research}편(리뷰 {reviews}편 분리) → 관련성 {meta['min_relevance']}점 이상 "
-         f"{passed}편 → 총점 순 {p['selected']}편", True),
-        (f"총점: 관련성 {w['relevance']} · 인용 {w['citation']} · 학술지 {w['venue']} 가중평균 × 문헌 종류 가중치 "
-         f"(저널 {cw['journal']} · 학회 {cw['conference']} · 프리프린트 {cw['preprint']}) — 인용·학술지는 검색 후보 {p['screened'] - (meta.get('cocited') or {}).get('added_total', 0)}편 안의 백분위", False),
-        ((f"분석 편수: 기준 {meta['min_total_score']}은 {rules['scoring']['min_total_score_basis']} — 품질 판정 기준이 아님"
+        (tr("핵심논문 선정: 후보 {screened}편 → 연구 논문 {research}편(리뷰 {reviews}편 분리) → 관련성 {min_relevance}점 이상 "
+            "{passed}편 → 총점 순 {selected}편", screened=p["screened"], research=research, reviews=reviews,
+            min_relevance=meta["min_relevance"], passed=passed, selected=p["selected"]), True),
+        (tr("총점: 관련성 {w_relevance} · 인용 {w_citation} · 학술지 {w_venue} 가중평균 × 문헌 종류 가중치 "
+            "(저널 {w_journal} · 학회 {w_conference} · 프리프린트 {w_preprint}) — 인용·학술지는 검색 후보 {n}편 안의 백분위",
+            w_relevance=w["relevance"], w_citation=w["citation"], w_venue=w["venue"], w_journal=cw["journal"],
+            w_conference=cw["conference"], w_preprint=cw["preprint"], n=p["screened"] - cocited_added), False),
+        ((tr("분석 편수: 기준 {min_total_score}은 {basis} — 품질 판정 기준이 아님",
+             min_total_score=meta["min_total_score"], basis=tr(rules["scoring"]["min_total_score_basis"]))
           if rules["scoring"].get("min_total_score_basis") and not any(o["key"] == "min_total_score" for o in overrides)
-          else f"분석 편수: 총점 {meta['min_total_score']} 이상 — 총점은 조사 우선순위이며 품질 판정이 아님")
-         + (f" (상한 때문에 빠진 논문 {p['over_limit']}편)" if p["over_limit"] else ""), True),
-        (f"선정 밖 점검: 관련성은 통과했지만 빠진 {p['below_threshold'] + p['over_limit']}편 (총점 미달 {p['below_threshold']}편 · "
-         f"상한 초과 {p['over_limit']}편, 그중 인용 0회 {sum(r['status'] in OUTSIDE and r['cited_by_count'] == 0 for r in records)}편) "
-         "— 엑셀 '선정 밖 목록'", False),
-        (f"문헌조사논문(리뷰): 관련성 {review['min_relevance']}점 이상 후보를 {review_judged} "
-         f"{p['reviews_listed']}편 (최대 {review['max_listed']}편, 채우지 않음) — 핵심논문 통계에 섞지 않음", False),
-        *([(f"기관·선급 문서: 검색 후보 중 {institutions}편(실린 곳·발행처가 기관·선급) → 관련성 기준 통과 {p.get('institutions_listed', 0)}편을 "
-             "따로 목록에 둠 (핵심논문 통계에 섞지 않음)", False)] if institutions else []),
-        ((f"교차 채점: 다른 AI가 {verified}편의 관련성을 다시 채점해 낮은 점수 채택 — 재현 가능한 절차일 뿐 신뢰성 입증은 아님" if verified
-          else "교차 채점: 하지 않음 — 관련성은 채점한 AI 하나의 판단"), False),
+          else tr("분석 편수: 총점 {min_total_score} 이상 — 총점은 조사 우선순위이며 품질 판정이 아님", min_total_score=meta["min_total_score"]))
+         + (tr(" (상한 때문에 빠진 논문 {n}편)", n=p["over_limit"]) if p["over_limit"] else ""), True),
+        (tr("선정 밖 점검: 관련성은 통과했지만 빠진 {n}편 (총점 미달 {below}편 · 상한 초과 {over}편, 그중 인용 0회 {uncited}편) "
+            "— 엑셀 '선정 밖 목록'", n=p["below_threshold"] + p["over_limit"], below=p["below_threshold"], over=p["over_limit"],
+            uncited=outside_uncited), False),
+        (tr("문헌조사논문(리뷰): 관련성 {min_relevance}점 이상 후보를 {judged} {n}편 (최대 {max_listed}편, 채우지 않음) — 핵심논문 통계에 섞지 않음",
+            min_relevance=review["min_relevance"], judged=review_judged, n=p["reviews_listed"], max_listed=review["max_listed"]), False),
+        *([(tr("기관·선급 문서: 검색 후보 중 {n}편(실린 곳·발행처가 기관·선급) → 관련성 기준 통과 {listed}편을 "
+               "따로 목록에 둠 (핵심논문 통계에 섞지 않음)", n=institutions, listed=p.get("institutions_listed", 0)), False)]
+          if institutions else []),
+        ((tr("교차 채점: 다른 AI가 {n}편의 관련성을 다시 채점해 낮은 점수 채택 — 재현 가능한 절차일 뿐 신뢰성 입증은 아님", n=verified)
+          if verified else tr("교차 채점: 하지 않음 — 관련성은 채점한 AI 하나의 판단")), False),
     ]
     if update := meta.get("update"):  # 누적 갱신 (사용자 지정 방식, merge_runs.py)
-        lines.insert(2, (f"누적 갱신: {update['base_date']} 검색 결과에 같은 검색어로 다시 찾은 새 후보 {update['added_candidates']}편을 더해 "
-                         f"전체를 다시 점수화 → 새로 든 핵심논문 {update['new']}편(NEW), 밀려난 이전 핵심논문 {update['dropped']}편 "
-                         f"(엑셀 '이전 선정 제외', 이전 결과는 {update['base']}/)"
-                         + (f" — 새 후보 중 관련성은 통과했지만 총점 미달 {n}편 (출판 직후라 인용이 적음, 엑셀 '선정 밖 목록')"
+        lines.insert(2, (tr("누적 갱신: {base_date} 검색 결과에 같은 검색어로 다시 찾은 새 후보 {added}편을 더해 "
+                            "전체를 다시 점수화 → 새로 든 핵심논문 {new}편(NEW), 밀려난 이전 핵심논문 {dropped}편 "
+                            "(엑셀 '이전 선정 제외', 이전 결과는 {base}/)", base_date=update["base_date"],
+                            added=update["added_candidates"], new=update["new"], dropped=update["dropped"], base=update["base"])
+                         + (tr(" — 새 후보 중 관련성은 통과했지만 총점 미달 {n}편 (출판 직후라 인용이 적음, 엑셀 '선정 밖 목록')", n=n)
                             if (n := update.get("fresh_passed_not_selected")) else ""), True))
     if overrides:
-        lines.append(("기본값과 다른 선정 기준 (사용자 변경 — 권장 기준 아님): "
-                      + " · ".join(f"{o['key']} {o['default']}→{o['value']}({o['source']})" for o in overrides), True))
+        lines.append((tr("기본값과 다른 선정 기준 (사용자 변경 — 권장 기준 아님): {items}",
+                         items=" · ".join(f"{o['key']} {o['default']}→{o['value']}({tr(o['source'])})" for o in overrides)), True))
     if capped:
-        lines.append((f"검색 한계: 검색어마다 상위 {capped[0]['retrieved']}편만 받음(예상 총 "
-                      + "·".join(f"{q['expected_total']:,}" for q in capped) + "편), 검색원 1곳", True))
+        lines.append((tr("검색 한계: 검색어마다 상위 {retrieved}편만 받음(예상 총 {expected}편), 검색원 1곳", retrieved=capped[0]["retrieved"],
+                         expected="·".join(f"{q['expected_total']:,}" for q in capped)), True))
     if title_only:
-        lines.append((f"제목만 검토: 수집 메타데이터에 초록이 없는 {len(title_only)}편 ({', '.join(title_only)})", False))
+        lines.append((tr("제목만 검토: 수집 메타데이터에 초록이 없는 {n}편 ({keys})", n=len(title_only), keys=", ".join(title_only)), False))
     return lines
 
 
-ADJACENT_NOTE = "관련성은 선정 기준 아래지만 인용·학술지 점수가 높은 연구논문 — 핵심논문과 별도 참고용, 본문 근거로 쓰지 않음 (점수는 후보 안 상대 순위)"
+# 쓰는 곳에서 tr(ADJACENT_NOTE)
+ADJACENT_NOTE = tr_later("관련성은 선정 기준 아래지만 인용·학술지 점수가 높은 연구논문 — 핵심논문과 별도 참고용, 본문 근거로 쓰지 않음 (점수는 후보 안 상대 순위)")
 
 
 def adjacent_rows(s: dict, refs: dict) -> list[list]:
     """주목할 인접 문헌 표 (사용자 결정 2026-10-16): [인용 키, 제목, 연도·실린 곳, 피인용, 관련성, 알아 둘 이유]."""
     return [[a["key"], refs[a["key"]]["title"], f"{refs[a['key']]['year']} · {refs[a['key']].get('venue') or ''}",
-             refs[a["key"]].get("cited_by_count"), f"{refs[a['key']]['relevance']}점", a["why"]] for a in s.get("adjacent_guide", [])]
+             refs[a["key"]].get("cited_by_count"), tr("{n}점", n=refs[a["key"]]["relevance"]), a["why"]] for a in s.get("adjacent_guide", [])]
 
 
 def claim_basis(claim: dict, level_of: dict[str, str]) -> str:
     """편수 주장의 근거 수준 표시 — 요약이 '초록 판독'으로 적었어도 해당 논문 중 본문을 읽은 것이 있으면 그대로 밝힘
     (10-16 Codex 지적: 전문으로 확인한 논문이 섞여도 '초록 판독'으로만 표기)."""
     if claim.get("basis") != "초록 판독":
-        return claim.get("basis", "")
+        return tr(claim.get("basis", ""))  # 요약이 쓴 코드 ('자동 집계' 등) — 표시할 때 번역
     levels = {level_of.get(k) for k in claim.get("keys", [])}
-    return ("전문 판독" if levels == {"전문"} else "초록·전문 판독") if "전문" in levels else "초록 판독"
+    return (tr("전문 판독") if levels == {"전문"} else tr("초록·전문 판독")) if "전문" in levels else tr("초록 판독")
 
 
-OUTSIDE = {"below_threshold": "총점 미달", "over_limit": "상한 초과"}  # 관련성은 통과했지만 핵심논문에서 빠진 상태 → 표시 이유
+OUTSIDE = {"below_threshold": tr_later("총점 미달"), "over_limit": tr_later("상한 초과")}  # 관련성은 통과했지만 핵심논문에서 빠진 상태 → 표시 이유 (값은 쓰는 곳에서 tr)
 
 
 def excluded_rows(records: list[dict], axis: dict) -> list[list]:
     """관련성은 통과했지만 총점 미달·상한 초과로 빠진 논문 (총점 순) — 마지막 칸이 빠진 이유 (10-16 결함: 두 경우가 섞여 '총점 미달'로만 안내)."""
     out = [r for r in records if r["status"] in OUTSIDE]
     rank_from = sum(r["status"] == "selected" for r in records)
-    return [[rank_from + i, r["title"], r["year"], CATEGORY_LABEL.get(r["category"], r["category"]), r["cited_by_count"],
-             r["relevance"], f"{r['total_score']:.2f}", axis_group(r, axis), OUTSIDE[r["status"]]]
+    return [[rank_from + i, r["title"], r["year"], tr(CATEGORY_LABEL.get(r["category"], r["category"])), r["cited_by_count"],
+             r["relevance"], f"{r['total_score']:.2f}", tr(axis_group(r, axis)), tr(OUTSIDE[r["status"]])]
             for i, r in enumerate(sorted(out, key=lambda r: -r["total_score"]), 1)]
 
 
@@ -191,14 +210,14 @@ def excluded_comparison(records: list[dict], axis: dict) -> list[list]:
 
     rows = []
     for label, key, values in (
-            ("출판 연도", lambda r: r["year"], sorted({r["year"] for r in sel + out})),
-            ("문헌 종류", lambda r: CATEGORY_LABEL.get(r["category"], r["category"]), list(CATEGORY_LABEL.values())),
-            (axis["name"], lambda r: axis_group(r, axis), axis_labels(axis))):
+            (tr("출판 연도"), lambda r: r["year"], sorted({r["year"] for r in sel + out})),
+            (tr("문헌 종류"), lambda r: CATEGORY_LABEL.get(r["category"], r["category"]), list(CATEGORY_LABEL.values())),
+            (tr(axis["name"]), lambda r: axis_group(r, axis), axis_labels(axis))):
         a, b = count(sel, key), count(out, key)
-        rows += [[f"{label}: {v}", a[v], b[v]] for v in values if a[v] or b[v]]
-    rows.append(["인용 0회", sum(r["cited_by_count"] == 0 for r in sel), sum(r["cited_by_count"] == 0 for r in out)])
-    rows.append(["관련성 5점", sum(r["relevance"] == 5 for r in sel), sum(r["relevance"] == 5 for r in out)])
-    return [["합계", len(sel), len(out)]] + rows
+        rows += [[f"{label}: {tr(str(v))}", a[v], b[v]] for v in values if a[v] or b[v]]  # 묶음 값은 코드 — 표시만 번역
+    rows.append([tr("인용 0회"), sum(r["cited_by_count"] == 0 for r in sel), sum(r["cited_by_count"] == 0 for r in out)])
+    rows.append([tr("관련성 5점"), sum(r["relevance"] == 5 for r in sel), sum(r["relevance"] == 5 for r in out)])
+    return [[tr("합계"), len(sel), len(out)]] + rows
 
 
 if __name__ == "__main__":  # 최소 확인

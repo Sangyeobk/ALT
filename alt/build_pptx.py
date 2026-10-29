@@ -24,7 +24,7 @@ from pptx.enum.text import MSO_ANCHOR, MSO_AUTO_SIZE, PP_ALIGN
 from pptx.util import Cm, Emu, Pt
 
 from common import (PRISMA_NOTE, PROJECT_DIR, Abbreviations, verbatim_strings, add_variant, cite as cite_all, display_names, keyword_chunks, keyword_tag, load_config, tech_keywords, load_topic, map_axis, read_json, report_title,
-                    review_info, role_label, scope_history, sections, topic_line, variant_name)
+                    output_language, review_info, role_label, scope_history, sections, topic_line, tr, use_language, variant_name)
 from export_references import EXCEL_SHEETS
 from report_facts import adjacent_rows, excluded_comparison, excluded_rows, fulltext_label, method_lines, role_of
 from slides_plan import (DECK_FILES, LEARN_TAIL, TABLE_MAX_ROWS, check_learn_plan, check_plan, figure_sources, load_catalog, slot_limits,
@@ -113,7 +113,7 @@ def set_font(run) -> None:
     """글꼴은 전부 맑은 고딕 (사용자 결정 2026-10-21) — 영문(latin)과 한글(ea) 모두."""
     run.font.name = FONT
     rpr = run._r.get_or_add_rPr()
-    rpr.set("lang", "ko-KR")  # 한국어로 지정해야 PowerPoint가 한글을 단어 단위로 줄바꿈 (eaLnBrk="0"과 함께)
+    rpr.set("lang", "ko-KR" if output_language() == "ko" else "en-US")  # 한국어로 지정해야 PowerPoint가 한글을 단어 단위로 줄바꿈 (eaLnBrk="0"과 함께)
     ea = rpr.find(qn("a:ea"))
     if ea is None:
         ea = rpr.makeelement(qn("a:ea"), {})
@@ -562,7 +562,7 @@ class Deck:
 
     def image(self, slide, path: Path, top=BODY_TOP, max_w=31.8, max_h=14.6, left=None):
         if not path.is_file():
-            self.text(slide, f"(그림 없음: {path.name})", BODY_LEFT, top, 20, 1, 14)
+            self.text(slide, tr("(그림 없음: {name})", name=path.name), BODY_LEFT, top, 20, 1, 14)
             return
         pic = slide.shapes.add_picture(str(path), self.x(left if left is not None else BODY_LEFT), self.y(top))
         scale = min(self.d(max_w) / pic.width, self.d(max_h) / pic.height)
@@ -617,29 +617,29 @@ def chunks(items, size):
 # ---------- 발표 장 (id는 report_guide.md · config output.slide_sections, 보고서와 같은 흐름) ----------
 def table_slides(deck, title, subtitle, header, rows, widths, per=TABLE_ROWS_PER_SLIDE, size=11):
     for part, chunk in enumerate(chunks(rows, per)):
-        deck.table(deck.slide(title, subtitle + (" (계속)" if part else "")), header, chunk, widths, size=size)
+        deck.table(deck.slide(title, subtitle + (tr(" (계속)") if part else "")), header, chunk, widths, size=size)
 
 
 def talk_purpose(deck, c):
     sc = c.s["scope"]
-    slide = deck.slide("Purpose & Scope", "[목적] 무엇을 왜 조사했나")
+    slide = deck.slide("Purpose & Scope", tr("[목적] 무엇을 왜 조사했나"))
     deck.bullets(slide, [(sc["question"], True)], height=2.4, size=16)
     show_flow = "landscape" not in sections("slide", c.run_dir)  # 흐름도는 연구 접근 장에 한 번만
     if show_flow:
         deck.flow(slide, sc["flow"], top=6.6)
     asked = topic_line(c.run_dir, c.refs).partition(": ")[2]  # 확정 주제 이름 그대로 (사용자 지시 2026-10-16)
     history = scope_history(c.run_dir)  # 입력 원문 → 범위 결정 → 세부 조사 (사용자 피드백 2026-10-16)
-    rows = [*[[label, text] for label, text in history[:2]], *([["주제", asked]] if asked else []),
+    rows = [*[[label, text] for label, text in history[:2]], *([[tr("주제"), asked]] if asked else []),
             *[[label, text] for label, text in history[2:]],
-            ["핵심", sc["core"]], ["활용·확장", sc["extension"]], ["제외", sc["excluded"]]]
-    deck.table(slide, ["구분", "범위"], rows, [4.0, 27.8], top=10.4 if show_flow else 6.6, size=13 if len(rows) <= 5 else 12)
+            [tr("핵심"), sc["core"]], [tr("활용·확장"), sc["extension"]], [tr("제외"), sc["excluded"]]]
+    deck.table(slide, [tr("구분"), tr("범위")], rows, [4.0, 27.8], top=10.4 if show_flow else 6.6, size=13 if len(rows) <= 5 else 12)
     if c.kw:  # 핵심 키워드: 이 발표가 결론까지 따라가는 판단 기준
-        slide = deck.slide("Purpose & Scope", "[키워드] 조사 전체에 쓰는 판단 기준")
-        deck.table(slide, ["핵심 키워드", "뜻", "각 연구에 묻는 것"],
+        slide = deck.slide("Purpose & Scope", tr("[키워드] 조사 전체에 쓰는 판단 기준"))
+        deck.table(slide, [tr("핵심 키워드"), tr("뜻"), tr("각 연구에 묻는 것")],
                    [[k["term"], k["plain"], k["question"]] for k in c.kw], [6.0, 14.0, 11.8], size=14)
     if sc.get("problem_types"):
-        slide = deck.slide("Purpose & Scope", "[목적] 문제 유형 — 입력·출력이 달라 같은 지표로 비교할 수 없음")
-        deck.table(slide, ["문제 유형", "입력", "출력", "왜 필요한가"],
+        slide = deck.slide("Purpose & Scope", tr("[목적] 문제 유형 — 입력·출력이 달라 같은 지표로 비교할 수 없음"))
+        deck.table(slide, [tr("문제 유형"), tr("입력"), tr("출력"), tr("왜 필요한가")],
                    [[t["name"], t["input"], t["output"], t["why"]] for t in sc["problem_types"]], [6.0, 8.0, 8.0, 9.8], size=13)
         if sc.get("framing"):
             deck.bullets(slide, [(sc["framing"], True)], top=15.6, height=2.4, size=14)
@@ -647,15 +647,16 @@ def talk_purpose(deck, c):
 
 def talk_summary(deck, c):
     p = c.meta["prisma"]
-    slide = deck.slide("Key Insight", "[인사이트] " + ((c.s.get("leads") or {}).get("summary") or "주요 발견"))
+    slide = deck.slide("Key Insight", tr("[인사이트] ") + ((c.s.get("leads") or {}).get("summary") or tr("주요 발견")))
     deck.key_box(slide, "Key Message :", [keyword_tag(m, c.kw) + m["text"] + cite(m) for m in c.s["key_messages"]], size=16)
-    deck.bullets(slide, [("유의점: " + i["text"], False) for i in c.s["limitations"][:2]]
-                 + [(f"근거: 핵심논문 {p['selected']}편·문헌조사논문 {p['reviews_listed']}편 — {c.review_line}", False)],
+    deck.bullets(slide, [(tr("유의점: {detail}", detail=i["text"]), False) for i in c.s["limitations"][:2]]
+                 + [(tr("근거: 핵심논문 {selected}편·문헌조사논문 {reviews}편 — {review_line}",
+                        selected=p["selected"], reviews=p["reviews_listed"], review_line=c.review_line), False)],
                  top=13.4, height=4, size=12)
 
 
 def talk_method(deck, c):
-    subtitle = "[선별] 검색·선정 방법과 한계"
+    subtitle = tr("[선별] 검색·선정 방법과 한계")
     lines = method_lines(c.meta, c.records, c.config, c.level_of, load_topic(c.run_dir))
     size = 12
     pages = bullets_pages(lines, (18.6, BODY_BOTTOM - 3.8), (BODY_WIDTH, BODY_BOTTOM - BODY_TOP), size)
@@ -663,33 +664,33 @@ def talk_method(deck, c):
     deck.image(slide, c.run_dir / "figures" / "prisma.png", top=3.8, max_w=13.5, max_h=14.5, left=0.6)
     deck.bullets(slide, pages[0], left=14.6, width=18.6, top=3.8, height=BODY_BOTTOM - 3.8, size=size)
     for page in pages[1:]:  # 넘치는 줄은 다음 장에 전체 폭으로 (사용자 피드백 2026-10-16)
-        deck.bullets(deck.slide("Methodology", subtitle + " (계속)"), page, height=BODY_BOTTOM - BODY_TOP, size=size)
+        deck.bullets(deck.slide("Methodology", subtitle + tr(" (계속)")), page, height=BODY_BOTTOM - BODY_TOP, size=size)
 
 
 def talk_landscape(deck, c):
     flow_png, roles_png = c.run_dir / "figures" / c.vname("theory_flow.png"), c.run_dir / "figures" / c.vname("limit_response.png")
     leads, ap = c.s.get("leads") or {}, display_names(c.run_dir, c.s, c.meta)["approach"]
     if flow_png.is_file():  # 장당 메시지 하나: 흐름도+문헌 / 한계→대응
-        slide = deck.slide("Research Approaches", "[위치] " + (leads.get("landscape") or f"기술 흐름에서 {ap} 연구의 위치"))
+        slide = deck.slide("Research Approaches", tr("[위치] ") + (leads.get("landscape") or tr("기술 흐름에서 {ap} 연구의 위치", ap=ap)))
         deck.image(slide, flow_png, top=3.7, max_h=14.6)
     if roles_png.is_file():
-        slide = deck.slide("Research Approaches", "[접근] " + (leads.get("roles") or f"기존 방법의 한계 → {ap}의 역할"))
+        slide = deck.slide("Research Approaches", tr("[접근] ") + (leads.get("roles") or tr("기존 방법의 한계 → {ap}의 역할", ap=ap)))
         deck.image(slide, roles_png, top=4.2, max_h=13.5)
     else:
-        slide = deck.slide("Research Approaches", "[접근] " + (leads.get("roles") or leads.get("landscape") or f"{ap}의 역할"))
+        slide = deck.slide("Research Approaches", tr("[접근] ") + (leads.get("roles") or leads.get("landscape") or tr("{ap}의 역할", ap=ap)))
         deck.flow(slide, c.s["scope"]["flow"], top=3.9)
     if c.s.get("approach_roles") and not roles_png.is_file():
-        deck.table(slide, ["접근(역할)", "예측 대상", "주로 쓰는 자료", "확인해야 할 성능"],
+        deck.table(slide, [tr("접근(역할)"), tr("예측 대상"), tr("주로 쓰는 자료"), tr("확인해야 할 성능")],
                    [[a["role"], a["target"], a["data"], a["check"]] for a in c.s["approach_roles"]],
                    [6.0, 8.6, 8.2, 9.0], top=7.6, size=12)
-    slide = deck.slide("Research Approaches", "[분포] " + (leads.get("map") or f"문헌지도 — {c.axis['name']} × 접근법별 후보 분포"))
+    slide = deck.slide("Research Approaches", tr("[분포] ") + (leads.get("map") or tr("문헌지도 — {axis} × 접근법별 후보 분포", axis=tr(c.axis["name"]))))
     # 그림은 왼쪽에 크게, 관찰은 오른쪽 칸 (사용자 피드백 2026-10-16: 아래에 두면 그림 높이가 묶여 작음)
     deck.image(slide, c.run_dir / "02_literature_map.png", top=3.7, max_w=22.5, max_h=BODY_BOTTOM - 3.7, left=BODY_LEFT)
     deck.bullets(slide, [(i["text"] + cite(i), n == 0) for n, i in enumerate(c.s["map_observations"])],
                  top=4.0, left=24.0, width=BODY_LEFT + BODY_WIDTH - 24.0, height=BODY_BOTTOM - 4.0, size=12)
     dist_png = c.run_dir / "figures" / "distribution.png"
     if dist_png.is_file():  # 논문 수 분포 — 대륙·축·접근법 (사용자 피드백 2026-10-19)
-        slide = deck.slide("Research Approaches", f"[통계] 논문 수 분포 — {c.axis['name']}·접근법·대륙 (남색 = 핵심논문)")
+        slide = deck.slide("Research Approaches", tr("[통계] 논문 수 분포 — {axis}·접근법·대륙 (남색 = 핵심논문)", axis=tr(c.axis["name"])))
         deck.image(slide, dist_png, top=3.9, max_h=BODY_BOTTOM - 3.9)
 
 
@@ -710,9 +711,9 @@ def subtopic_papers_table(deck, slide, c, t, top: float) -> None:
         height += row_h
     if not rows:
         return
-    deck.table(slide, ["인용 키", "방법", "입력 자료", "검증·결과"], rows, widths, top=top, size=size)
+    deck.table(slide, [tr("인용 키"), tr("방법"), tr("입력 자료"), tr("검증·결과")], rows, widths, top=top, size=size)
     if len(rows_all) > len(rows):
-        deck.text(slide, f"외 {len(rows_all) - len(rows)}편 — 05_references 엑셀 '방법 비교' 시트", BODY_LEFT, top + height + 0.15,
+        deck.text(slide, tr("외 {n}편 — 05_references 엑셀 '방법 비교' 시트", n=len(rows_all) - len(rows)), BODY_LEFT, top + height + 0.15,
                   BODY_WIDTH, note_h, 11, bold=False)
 
 
@@ -720,28 +721,29 @@ def talk_subtopics(deck, c):
     tree_png = c.run_dir / "figures" / c.vname("tech_tree.png")
     if tree_png.is_file():  # 분야별 장 앞에 전체 지도 한 장 (사용자 결정 2026-10-16)
         ap = display_names(c.run_dir, c.s, c.meta)["approach"]
-        slide = deck.slide("Subtopics", "[계통] " + ((c.s.get("leads") or {}).get("subtopics")
-                                                    or f"{ap} 연구 {len(c.s['subtopics'])}개 분야의 구성"))
+        slide = deck.slide("Subtopics", tr("[계통] ") + ((c.s.get("leads") or {}).get("subtopics")
+                                                        or tr("{ap} 연구 {n}개 분야의 구성", ap=ap, n=len(c.s["subtopics"]))))
         deck.image(slide, tree_png, top=3.7, max_h=14.6)
     for t in c.s["subtopics"]:
         # 보고서 분야 절과 같은 전개 (사용자 결정 2026-10-19): 요지(소제목) → (1) 목적과 방법 → (2) 주요 결과 → (3) 종합 및 남은 과제.
         # 슬라이드는 적게 — 결과 2개·남은 과제 1개, '핵심 범위와의 관계'는 보고서에만
         slide = deck.slide("Subtopics", f"[{t['name']}] " + (t.get("lead") or t["problem"]))
-        parts = [("(1) 연구 목적과 방법", [(f"목적: {t['problem']} — {role_label(t, c.s)}, {len(t['papers'])}편", False),
-                                       *([("방법: " + t["approaches"], False)] if t.get("approaches") else []),
-                                       ("입력 → 출력: " + t["io"], False)]),
-                 ("(2) 주요 결과", [(i["text"] + cite(i), False) for i in t["reported"][:2]]),
-                 ("(3) 종합 및 남은 과제", [*([("종합: " + t["synthesis"], False)] if t.get("lead") and t.get("synthesis") else []),
-                                         *[("남은 과제: " + u, True) for u in t["unverified"][:1]]])]
+        parts = [(tr("(1) 연구 목적과 방법"), [(tr("목적: {problem} — {role}, {n}편", problem=t["problem"], role=role_label(t, c.s),
+                                                n=len(t["papers"])), False),
+                                             *([(tr("방법: {detail}", detail=t["approaches"]), False)] if t.get("approaches") else []),
+                                             (tr("입력 → 출력: {detail}", detail=t["io"]), False)]),
+                 (tr("(2) 주요 결과"), [(i["text"] + cite(i), False) for i in t["reported"][:2]]),
+                 (tr("(3) 종합 및 남은 과제"), [*([(tr("종합: {detail}", detail=t["synthesis"]), False)] if t.get("lead") and t.get("synthesis") else []),
+                                               *[(tr("남은 과제: {detail}", detail=u), True) for u in t["unverified"][:1]]])]
         parts = [(head, items) for head, items in parts if items]
         deck.sections(slide, parts, size=SUBTOPIC_SIZE)
         table_top = BODY_TOP + sections_height(parts, BODY_WIDTH, SUBTOPIC_SIZE) + 0.3
         if BODY_BOTTOM - table_top < SUBTOPIC_TABLE_MIN_CM:  # 표 자리가 모자라면 다음 장에 (표가 사라지지 않게)
-            slide, table_top = deck.slide("Subtopics", f"[{t['name']}] 이 분야 논문 — 방법·입력·검증"), BODY_TOP
+            slide, table_top = deck.slide("Subtopics", tr("[{name}] 이 분야 논문 — 방법·입력·검증", name=t["name"])), BODY_TOP
         subtopic_papers_table(deck, slide, c, t, table_top)
         figures = [f for f in c.s.get("figures", []) if f["subtopic"] == t["id"]][:2]
         if figures:  # 전문 모드: 원문 그림 + 빨간 번호·출처 (KR 발표 양식)
-            slide = deck.slide("Subtopics", f"[원문 그림] {t['name']}")
+            slide = deck.slide("Subtopics", tr("[원문 그림] {name}", name=t["name"]))
             width = BODY_WIDTH / len(figures) - 0.6
             for i, fig in enumerate(figures):
                 left = BODY_LEFT + i * (width + 0.6)
@@ -751,87 +753,93 @@ def talk_subtopics(deck, c):
                                   left, 14.6, width, 2.6)
     if c.s.get("keyword_matrix") and c.kw:  # 분야 × 핵심 키워드 — 결론의 키워드 판단이 여기서 나옴
         width = 23.8 / len(c.kw)
-        deck.table(deck.slide("Subtopics", "[종합] " + ((c.s.get("leads") or {}).get("matrix") or "분야 × 핵심 키워드 판단")),
-                   ["분야"] + [k["term"] for k in c.kw],
-                   [[t["name"]] + [c.s["keyword_matrix"].get(t["id"], {}).get(k["id"], "미확인") for k in c.kw] for t in c.s["subtopics"]],
+        deck.table(deck.slide("Subtopics", tr("[종합] ") + ((c.s.get("leads") or {}).get("matrix") or tr("분야 × 핵심 키워드 판단"))),
+                   [tr("분야")] + [k["term"] for k in c.kw],
+                   [[t["name"]] + [tr(c.s["keyword_matrix"].get(t["id"], {}).get(k["id"], "미확인")) for k in c.kw] for t in c.s["subtopics"]],
                    [8.0] + [width] * len(c.kw), size=12)
     metric_rows = [[m["key"], m["metric"], m["value"], m["condition"], f"p.{m['page']}"] for m in c.s.get("metrics_table", [])]
     if metric_rows:  # 전문 모드
-        table_slides(deck, "Subtopics", "[비교] 수치 비교표 — 각 연구의 검증 조건에서 보고된 값", ["인용 키", "지표", "값", "조건", "쪽"],
+        table_slides(deck, "Subtopics", tr("[비교] 수치 비교표 — 각 연구의 검증 조건에서 보고된 값"),
+                     [tr("인용 키"), tr("지표"), tr("값"), tr("조건"), tr("쪽")],
                      metric_rows, [4.6, 4.4, 4.0, 15.4, 3.4])
 
 
 def talk_issues(deck, c):
     issues = sorted(c.s["issues"], key=lambda i: i.get("priority", 99))
-    table_slides(deck, "Open Issues", "[쟁점] 아직 답이 없는 질문 (순위: 이 조사의 판단)", ["순위", "열린 질문", "근거가 된 관찰"],
+    table_slides(deck, "Open Issues", tr("[쟁점] 아직 답이 없는 질문 (순위: 이 조사의 판단)"), [tr("순위"), tr("열린 질문"), tr("근거가 된 관찰")],
                  [[i.get("priority", ""), keyword_tag(i, c.kw) + i["question"], i["observation"] + cite(i)] for i in issues],
                  [1.8, 14.0, 16.0], per=5, size=12)
-    slide = deck.slide("Open Issues", "[방향] " + ((c.s.get("leads") or {}).get("outlook") or "관찰된 접근과 가설"))
+    slide = deck.slide("Open Issues", tr("[방향] ") + ((c.s.get("leads") or {}).get("outlook") or tr("관찰된 접근과 가설")))
     deck.image(slide, c.run_dir / "figures" / "gap_matrix.png", top=3.7, max_h=6.6)
     outlook = sorted(c.s["outlook"], key=lambda o: o.get("kind") != "관찰")[:MAX_BULLETS]
-    deck.bullets(slide, [(f"[{o.get('kind', '')}] {o['text']}{cite(o)}", False) for o in outlook],
+    deck.bullets(slide, [(f"[{tr(o.get('kind', ''))}] {o['text']}{cite(o)}", False) for o in outlook],
                  top=10.8, height=7.5, size=12)
 
 
 def talk_conclusion(deck, c):
     """결론: 연구 동향에 대한 판단 (독자가 논문을 직접 볼 것을 전제하지 않음, 읽기 목록 없음)."""
-    slide = deck.slide("Conclusion", "[결론] " + ((c.s.get("leads") or {}).get("conclusion") or "연구 동향에 대한 판단"))
+    slide = deck.slide("Conclusion", tr("[결론] ") + ((c.s.get("leads") or {}).get("conclusion") or tr("연구 동향에 대한 판단")))
     points = c.s["conclusion"].get("points", [])
     if c.kw:  # 핵심 키워드마다 한 줄 판단 (분야×키워드 표의 요약)
-        deck.table(slide, ["핵심 키워드", "판단"], [[keyword_tag(p, c.kw).strip("[] "), p["text"] + cite(p)] for p in points],
+        deck.table(slide, [tr("핵심 키워드"), tr("판단")], [[keyword_tag(p, c.kw).strip("[] "), p["text"] + cite(p)] for p in points],
                    [6.0, 25.8], size=14)
     else:
-        deck.bullets(slide, [(f"[{p.get('kind', '')}] {p['text']}{cite(p)}", p.get("kind") == "한계") for p in points],
+        deck.bullets(slide, [(f"[{tr(p.get('kind', ''))}] {p['text']}{cite(p)}", p.get("kind") == "한계") for p in points],
                      height=11.5, size=14)
     if c.s["conclusion"].get("closing"):
-        deck.key_box(slide, "Key Message : 종합", [c.s["conclusion"]["closing"]], top=15.2, height=2.6, size=15)
+        deck.key_box(slide, tr("Key Message : 종합"), [c.s["conclusion"]["closing"]], top=15.2, height=2.6, size=15)
 
 
 def talk_appendix_excel(deck, c):
-    slide = deck.slide("Appendix", "[상세 자료] 05_references.xlsx 시트 안내")
-    deck.table(slide, ["시트", "내용"], [[name, desc] for name, desc in EXCEL_SHEETS], [7.0, 24.8], size=12)
+    slide = deck.slide("Appendix", tr("[상세 자료] 05_references.xlsx 시트 안내"))
+    deck.table(slide, [tr("시트"), tr("내용")], [[tr(name), tr(desc)] for name, desc in EXCEL_SHEETS], [7.0, 24.8], size=12)
 
 
 def talk_appendix_methods(deck, c):
     role = role_of(c.s)
-    table_slides(deck, "Appendix", "[부록] 핵심논문 비교표", ["인용 키", "역할·관련성", "검토", "해결 문제", "방법", "구조물"],
-                 [[m["key"], f"{role.get(m['key'], '')} · {c.refs[m['key']]['relevance']}점", c.level_of.get(m["key"], ""),
+    table_slides(deck, "Appendix", tr("[부록] 핵심논문 비교표"),
+                 [tr("인용 키"), tr("역할·관련성"), tr("검토"), tr("해결 문제"), tr("방법"), tr("구조물")],
+                 [[m["key"], tr("{role} · {score}점", role=role.get(m["key"], ""), score=c.refs[m["key"]]["relevance"]),
+                   tr(c.level_of.get(m["key"], "")),
                    m.get("problem", ""), m["method"], m["structure"]] for m in c.s["method_comparison"]],
                  [4.0, 3.4, 2.0, 8.4, 9.6, 4.4])
 
 
 def talk_appendix_excluded(deck, c):
     rows = excluded_rows(c.records, c.axis)
-    slide = deck.slide("Appendix", f"[부록] 선정 밖 {len(rows)}편 점검 — 핵심논문과 분포 비교")
+    slide = deck.slide("Appendix", tr("[부록] 선정 밖 {n}편 점검 — 핵심논문과 분포 비교", n=len(rows)))
     comparison = excluded_comparison(c.records, c.axis)
-    structure = [r for r in comparison if str(r[0]).startswith(c.axis["name"] + ": ")]
-    deck.table(slide, ["항목", "핵심논문", "선정 밖"], [r for r in comparison if r not in structure], [8.6, 3.0, 3.0], size=10)
-    deck.table(slide, [c.axis["name"], "핵심논문", "선정 밖"], [[r[0].split(": ", 1)[1], r[1], r[2]] for r in structure],
+    axis_prefixes = (c.axis["name"] + ": ", tr(c.axis["name"]) + ": ")  # 행 이름이 원래 이름이든 번역된 이름이든
+    structure = [r for r in comparison if str(r[0]).startswith(axis_prefixes)]
+    deck.table(slide, [tr("항목"), tr("핵심논문"), tr("선정 밖")], [r for r in comparison if r not in structure], [8.6, 3.0, 3.0], size=10)
+    deck.table(slide, [tr(c.axis["name"]), tr("핵심논문"), tr("선정 밖")], [[tr(r[0].split(": ", 1)[1]), r[1], r[2]] for r in structure],
                [8.6, 3.0, 3.0], size=10, left=17.4)
-    deck.bullets(slide, [("관련성 기준은 통과했지만 총점 미달·상한 초과로 빠진 논문 — 선정 편수 제한이 결론을 바꾸는지 확인하기 위한 표", True)],
+    deck.bullets(slide, [(tr("관련성 기준은 통과했지만 총점 미달·상한 초과로 빠진 논문 — 선정 편수 제한이 결론을 바꾸는지 확인하기 위한 표"), True)],
                  top=16.2, height=1.6, size=13)
     if rows:
-        table_slides(deck, "Appendix", "[부록] 선정 밖 논문 목록", ["순위", "제목", "연도", "종류", "인용", "관련성", "총점", c.axis["name"], "이유"],
+        table_slides(deck, "Appendix", tr("[부록] 선정 밖 논문 목록"),
+                     [tr("순위"), tr("제목"), tr("연도"), tr("종류"), tr("인용"), tr("관련성"), tr("총점"), tr(c.axis["name"]), tr("이유")],
                      rows, [1.8, 12.6, 1.9, 2.4, 1.7, 2.0, 2.0, 5.0, 2.4], size=10)
 
 
 def talk_appendix_reviews(deck, c):
-    table_slides(deck, "Appendix", "[부록] 문헌조사논문 (핵심논문과 별도)", ["인용 키", "제목", "쓰임", "정리한 내용"],
-                 [[r["key"] + (" ★먼저" if r.get("core") else ""), c.refs[r["key"]]["title"], r.get("use", ""), r["why_read"]]
+    table_slides(deck, "Appendix", tr("[부록] 문헌조사논문 (핵심논문과 별도)"), [tr("인용 키"), tr("제목"), tr("쓰임"), tr("정리한 내용")],
+                 [[r["key"] + (tr(" ★먼저") if r.get("core") else ""), c.refs[r["key"]]["title"], tr(r.get("use", "")), r["why_read"]]
                   for r in c.s["reviews_guide"]], [5.0, 12.4, 3.6, 10.8], per=7)
 
 
 def talk_appendix_adjacent(deck, c):  # 주목할 인접 문헌 (사용자 결정 2026-10-16) — 없으면 장을 만들지 않음
     if c.s.get("adjacent_guide"):
-        table_slides(deck, "Appendix", "[부록] 주목할 인접 문헌 (핵심논문과 별도)", ["인용 키", "제목", "연도·실린 곳", "피인용", "관련성", "알아 둘 이유"],
+        table_slides(deck, "Appendix", tr("[부록] 주목할 인접 문헌 (핵심논문과 별도)"),
+                     [tr("인용 키"), tr("제목"), tr("연도·실린 곳"), tr("피인용"), tr("관련성"), tr("알아 둘 이유")],
                      adjacent_rows(c.s, c.refs), [4.0, 9.6, 5.4, 2.0, 2.0, 8.8], per=7)
 
 
 def talk_appendix_data(deck, c):
-    rows = [[d["name"], d.get("kind") or "", d.get("access") or "접근 미확인", ", ".join(d.get("used_by", []))]
+    rows = [[d["name"], tr(d.get("kind") or ""), tr(d.get("access") or "접근 미확인"), ", ".join(d.get("used_by", []))]
             for d in c.s.get("datasets_benchmarks", [])]
     if rows:
-        table_slides(deck, "Appendix", "[부록] 데이터·벤치마크 — 접근 상태 구분", ["이름", "종류", "접근 상태", "사용 논문"], rows,
+        table_slides(deck, "Appendix", tr("[부록] 데이터·벤치마크 — 접근 상태 구분"), [tr("이름"), tr("종류"), tr("접근 상태"), tr("사용 논문")], rows,
                      [12.0, 5.0, 5.0, 9.8])
 
 
@@ -859,7 +867,7 @@ class TalkContext:
 
 def build_talk(deck: Deck, s: dict, scored: dict, refs: dict, run_dir: Path, variant: str) -> None:
     c = TalkContext(s, scored, refs, run_dir, variant)
-    deck.set_cover(["LITERATURE SURVEY", report_title(run_dir, s, refs)], f"ALT Literature Survey (검색일 {c.meta['run_at'][:10]})")
+    deck.set_cover(["LITERATURE SURVEY", report_title(run_dir, s, refs)], tr("ALT Literature Survey (검색일 {date})", date=c.meta["run_at"][:10]))
     chosen = [sid for sid in sections("slide", run_dir) if sid in TALK_SECTIONS]  # 보고서 전용 장(용어·참고문헌)은 건너뜀
     names = list(dict.fromkeys(TALK_SECTIONS[sid][0] for sid in chosen))
     slide = deck.slide("Contents")
@@ -897,12 +905,12 @@ def build_learn_plan(deck: Deck, plan: dict, catalog: dict, run_dir: Path, s: di
     build_talk_plan(deck, plan, catalog, run_dir, s)
     types = catalog["types"]
     number = sum(spec["type"] == "section" for spec in plan["slides"]) + 1
-    deck.plan_slide(types["section"], {"slots": {"title": LEARN_TAIL}}, run_dir, number, {})
+    deck.plan_slide(types["section"], {"slots": {"title": [tr(line) for line in LEARN_TAIL]}}, run_dir, number, {})
     abbr = Abbreviations(s.get("abbreviations"))  # 용어 사전은 찾아보는 곳이라 항목마다 정식 명칭을 다시 보여 줌
     glossary = s["background"]["glossary"]
     for part, chunk in enumerate(chunks(glossary, TABLE_MAX_ROWS)):
-        spec = {"slots": {"title": ["보고서·발표에 나오는 용어" + (" (계속)" if part else "")]},
-                "table": {"header": ["용어", "쉬운 설명"], "rows": [[abbr(g["term"]), g["plain"]] for g in chunk]}}
+        spec = {"slots": {"title": [tr("보고서·발표에 나오는 용어") + (tr(" (계속)") if part else "")]},
+                "table": {"header": [tr("용어"), tr("쉬운 설명")], "rows": [[abbr(g["term"]), g["plain"]] for g in chunk]}}
         deck.plan_slide(types["table"], spec, run_dir, number, {})
     build_how_to_read(deck, s, meta, refs, run_dir)
 
@@ -927,93 +935,95 @@ def build_how_to_read(deck: Deck, s: dict, meta: dict, refs: dict, run_dir: Path
     key = (message.get("cites") or [next(iter(refs))])[0]
     sentence = message["text"] if len(message["text"]) <= 40 else message["text"][:40].rsplit(" ", 1)[0] + " …"
 
-    slide = deck.slide("How to Read", "[읽는 법 ①] 보고서·발표의 글 읽기")
-    deck.text(slide, "예시 (보고서·발표에 실제로 나오는 형태)", BODY_LEFT, 3.7, 20, 0.9, 13, bold=False)
+    slide = deck.slide("How to Read", tr("[읽는 법 ①] 보고서·발표의 글 읽기"))
+    deck.text(slide, tr("예시 (보고서·발표에 실제로 나오는 형태)"), BODY_LEFT, 3.7, 20, 0.9, 13, bold=False)
     deck.text(slide, f"“{sentence}”", BODY_LEFT, 4.7, 19.6, 1.8, 15, shape=True)
     deck.text(slide, f"[{key}]", 21.0, 4.7, 5.6, 1.8, 16, deck.c["annotation"], shape=True, align=PP_ALIGN.CENTER)
     deck.text(slide, "★" * (refs[key]["stars"] or 0), 27.2, 4.7, 5.6, 1.8, 18, shape=True, align=PP_ALIGN.CENTER)
     deck.arrow(slide, 23.8, 6.5, 23.8, 8.2)
     deck.arrow(slide, 30.0, 6.5, 30.0, 8.2)
-    deck.numbered_box(slide, "(1) 근거 논문 이름표 (인용 키)",
-                      ["첫 저자 성 + 발표 연도 (같으면 끝에 a·b)",
-                       "05_references.xlsx '인용 키' 열에서 찾기 → 제목·원문 링크"], 14.6, 8.4, 12.0, 3.6)
-    deck.numbered_box(slide, "(2) ★ = 총점 5단계",
-                      [f"총점 = 관련성 {w['relevance']} + 인용 {w['citation']} + 학술지 {w['venue']}",
-                       "조사 우선순위 점수 (논문 품질 판정 아님)"], 27.0, 8.4, 5.9, 3.6, size=12)
-    deck.numbered_box(slide, "(3) [일반 개념]",
-                      ["논문이 아니라 교과서 수준 설명", "출처 논문이 없는 기본 지식"], BODY_LEFT, 12.8, 10.0, 3.4)
-    deck.numbered_box(slide, f"(4) 관련성 0–5점",
-                      ["주제와 얼마나 직접 맞는가", f"AI 두 개가 채점 → 낮은 점수 채택, {meta['min_relevance']}점 이상만 선정"],
+    deck.numbered_box(slide, tr("(1) 근거 논문 이름표 (인용 키)"),
+                      [tr("첫 저자 성 + 발표 연도 (같으면 끝에 a·b)"),
+                       tr("05_references.xlsx '인용 키' 열에서 찾기 → 제목·원문 링크")], 14.6, 8.4, 12.0, 3.6)
+    deck.numbered_box(slide, tr("(2) ★ = 총점 5단계"),
+                      [tr("총점 = 관련성 {relevance} + 인용 {citation} + 학술지 {venue}",
+                          relevance=w["relevance"], citation=w["citation"], venue=w["venue"]),
+                       tr("조사 우선순위 점수 (논문 품질 판정 아님)")], 27.0, 8.4, 5.9, 3.6, size=12)
+    deck.numbered_box(slide, tr("(3) [일반 개념]"),
+                      [tr("논문이 아니라 교과서 수준 설명"), tr("출처 논문이 없는 기본 지식")], BODY_LEFT, 12.8, 10.0, 3.4)
+    deck.numbered_box(slide, tr("(4) 관련성 0–5점"),
+                      [tr("주제와 얼마나 직접 맞는가"), tr("AI 두 개가 채점 → 낮은 점수 채택, {score}점 이상만 선정", score=meta["min_relevance"])],
                       11.4, 12.8, 10.6, 3.4)
-    deck.numbered_box(slide, "(5) 리뷰 논문",
-                      ["다른 연구를 모아 정리한 논문", "30편과 따로 관리 → 처음 공부할 때 먼저 읽기"], 22.4, 12.8, 10.4, 3.4)
+    deck.numbered_box(slide, tr("(5) 리뷰 논문"),
+                      [tr("다른 연구를 모아 정리한 논문"), tr("30편과 따로 관리 → 처음 공부할 때 먼저 읽기")], 22.4, 12.8, 10.4, 3.4)
 
-    slide = deck.slide("How to Read", "[읽는 법 ②] 그림 읽기")
-    axis_name = map_axis(run_dir)["name"]
-    figures = [(run_dir / "02_literature_map.png", "(1) 문헌지도",
-                [f"가로 = {axis_name}, 세로 = 접근법, 원 크기 = 총점", "남색 = 핵심논문, ◆ = 문헌조사논문, 회색 = 기타 후보",
-                 "번호 = 핵심논문 상위 (오른쪽 목록)"]),
-               (run_dir / "figures" / "prisma.png", "(2) 문헌 선별 흐름도",
-                ["PRISMA 흐름도 형식 참조", "위 → 아래: 단계마다 남은 편수", "오른쪽 상자: 빠진 이유와 편수", "노란 상자: 핵심논문"]),
-               (run_dir / "figures" / "gap_matrix.png", "(3) 후보 문헌 분포",
-                [f"칸 숫자 = 그 접근법 × {axis_name} 편수", "진할수록 조사 표본에 많음", "· (0편) = 표본에서 미확인 (연구 부재 아님)"])]
+    slide = deck.slide("How to Read", tr("[읽는 법 ②] 그림 읽기"))
+    axis_name = tr(map_axis(run_dir)["name"])
+    figures = [(run_dir / "02_literature_map.png", tr("(1) 문헌지도"),
+                [tr("가로 = {axis}, 세로 = 접근법, 원 크기 = 총점", axis=axis_name), tr("남색 = 핵심논문, ◆ = 문헌조사논문, 회색 = 기타 후보"),
+                 tr("번호 = 핵심논문 상위 (오른쪽 목록)")]),
+               (run_dir / "figures" / "prisma.png", tr("(2) 문헌 선별 흐름도"),
+                [tr("PRISMA 흐름도 형식 참조"), tr("위 → 아래: 단계마다 남은 편수"), tr("오른쪽 상자: 빠진 이유와 편수"), tr("노란 상자: 핵심논문")]),
+               (run_dir / "figures" / "gap_matrix.png", tr("(3) 후보 문헌 분포"),
+                [tr("칸 숫자 = 그 접근법 × {axis} 편수", axis=axis_name), tr("진할수록 조사 표본에 많음"),
+                 tr("· (0편) = 표본에서 미확인 (연구 부재 아님)")])]
     for i, (path, title, lines) in enumerate(figures):
         left = BODY_LEFT + i * 10.75
         deck.text(slide, title.split(" ")[0], left, 3.7, 1.6, 0.9, 16, deck.c["annotation"], bold=True)
         deck.image(slide, path, top=4.7, max_w=10.2, max_h=6.6, left=left)
         deck.numbered_box(slide, title, lines, left, 11.6, 10.2, 4.6)
 
-    slide = deck.slide("How to Read", "[읽는 법 ③] 문헌 선별 흐름도 (PRISMA)")
-    deck.bullets(slide, [(line, i == len(PRISMA_NOTE) - 1) for i, line in enumerate(PRISMA_NOTE)], width=14.8, size=14)
+    slide = deck.slide("How to Read", tr("[읽는 법 ③] 문헌 선별 흐름도 (PRISMA)"))
+    deck.bullets(slide, [(tr(line), i == len(PRISMA_NOTE) - 1) for i, line in enumerate(PRISMA_NOTE)], width=14.8, size=14)
     deck.image(slide, run_dir / "figures" / "prisma.png", max_w=16.0, max_h=13.5, left=BODY_LEFT + 15.8)
 
 
 def build_learn(deck: Deck, s: dict, meta: dict, refs: dict, run_dir: Path, variant: str) -> None:
     b = s["background"]
-    deck.set_cover(["BACKGROUND STUDY", report_title(run_dir, s, refs)], f"ALT 배경학습 자료 ({meta['run_at'][:10]})")
+    deck.set_cover(["BACKGROUND STUDY", report_title(run_dir, s, refs)], tr("ALT 배경학습 자료 ({date})", date=meta["run_at"][:10]))
 
-    slide = deck.slide("Purpose", "[안내] 이 자료의 목적과 읽는 순서")
-    deck.bullets(slide, [(b["purpose"], True), ("문헌조사 결과가 아니라, 결과물을 쉽게 읽기 위한 배경 설명", False)], height=3.5)
-    deck.flow(slide, ["00_summary", "01_background\n(이 자료)", "02_literature_map", "03_report\n04_presentation", "05_references\n06_context"],
+    slide = deck.slide("Purpose", tr("[안내] 이 자료의 목적과 읽는 순서"))
+    deck.bullets(slide, [(b["purpose"], True), (tr("문헌조사 결과가 아니라, 결과물을 쉽게 읽기 위한 배경 설명"), False)], height=3.5)
+    deck.flow(slide, ["00_summary", tr("01_background\n(이 자료)"), "02_literature_map", "03_report\n04_presentation", "05_references\n06_context"],
               top=8.5, highlight_last=False)
 
     # 소제목은 장의 요지 (background.leads) — 없으면 실제 이름으로. 자리표시 말(config placeholder_phrases)은 쓰지 않음 (사용자 피드백 2026-10-16)
     leads, ap = b.get("leads") or {}, display_names(run_dir, s, meta)["approach"]
-    slide = deck.slide("Big Picture", "[큰 그림] " + (leads.get("big_picture") or " → ".join(b["big_picture"])))
+    slide = deck.slide("Big Picture", tr("[큰 그림] ") + (leads.get("big_picture") or " → ".join(b["big_picture"])))
     deck.flow(slide, b["big_picture"], top=5.5)
     deck.bullets(slide, [(b["big_picture_note"], False)], top=10.0, height=3)
 
     tree_png = run_dir / "figures" / variant_name("tech_tree.png", variant)
     if tree_png.is_file():  # 큰 그림 다음에 분야 구성 (사용자 결정 2026-10-16)
-        slide = deck.slide("Big Picture", f"[분야] {ap} 연구는 {len(s['subtopics'])}개 분야로 나뉨")
+        slide = deck.slide("Big Picture", tr("[분야] {ap} 연구는 {n}개 분야로 나뉨", ap=ap, n=len(s["subtopics"])))
         deck.image(slide, tree_png, top=3.7, max_h=14.6)
 
     for c in b["concepts"]:
-        slide = deck.slide("Key Concepts", f"[개념] {c['name']}")
+        slide = deck.slide("Key Concepts", tr("[개념] {name}", name=c["name"]))
         deck.bullets(slide, [(c["plain"], False)], height=4.5, size=18)
-        deck.key_box(slide, "왜 중요한가 :", [c["why"]], top=9.0, size=18)
-        deck.text(slide, f"근거: {c['source']}", BODY_LEFT, 16.6, 30, 0.9, 11, bold=False)
+        deck.key_box(slide, tr("왜 중요한가 :"), [c["why"]], top=9.0, size=18)
+        deck.text(slide, tr("근거: {source}", source=c["source"]), BODY_LEFT, 16.6, 30, 0.9, 11, bold=False)
 
-    slide = deck.slide("Approaches", "[비교] " + (leads.get("approaches") or f"기존 방법과 {ap}의 원리·장단점"))
-    deck.table(slide, ["접근법", "원리", "장점", "한계"],
+    slide = deck.slide("Approaches", tr("[비교] ") + (leads.get("approaches") or tr("기존 방법과 {ap}의 원리·장단점", ap=ap)))
+    deck.table(slide, [tr("접근법"), tr("원리"), tr("장점"), tr("한계")],
                [[a["approach"], a["principle"], a["pros"], a["cons"]] for a in b["approach_comparison"]], [4.0, 11.0, 8.4, 8.4], size=13)
 
-    slide = deck.slide("Approaches", "[원리] " + (leads.get("basics") or f"{ap}의 기본 단계"))
+    slide = deck.slide("Approaches", tr("[원리] ") + (leads.get("basics") or tr("{ap}의 기본 단계", ap=ap)))
     deck.flow(slide, b["data_driven_basics"], top=5.5)
 
     for part, chunk in enumerate(chunks(b["glossary"], 8)):
-        slide = deck.slide("Glossary", "[용어] 보고서·발표에 나오는 용어" + (" (계속)" if part else ""))
+        slide = deck.slide("Glossary", tr("[용어] 보고서·발표에 나오는 용어") + (tr(" (계속)") if part else ""))
         # 용어 사전은 찾아보는 곳이라 앞에서 풀었더라도 항목마다 정식 명칭을 다시 보여 준다
         terms = [Abbreviations(s.get("abbreviations"))(g["term"]) for g in chunk]
-        deck.table(slide, ["용어", "쉬운 설명"], [[t, g["plain"]] for t, g in zip(terms, chunk)], [9.5, 22.3], size=13)
+        deck.table(slide, [tr("용어"), tr("쉬운 설명")], [[t, g["plain"]] for t, g in zip(terms, chunk)], [9.5, 22.3], size=13)
 
     build_how_to_read(deck, s, meta, refs, run_dir)
 
     rows = [[r["key"], r["why_read"]] for r in s["reviews_guide"]]
     if rows:  # 문헌조사논문이 없으면(좁은 세부 조사) 빈 장을 두지 않음
         # 이름형 소제목 — 요지로 쓰면 아래 표의 리뷰 요약과 겹침 (사용자 결정 2026-10-16)
-        slide = deck.slide("Further Study", f"[참고] {ap} 연구를 정리한 문헌조사논문")
-        deck.table(slide, ["인용 키", "읽으면 좋은 이유"], rows[:10], [5.0, 26.8], size=11)
+        slide = deck.slide("Further Study", tr("[참고] {ap} 연구를 정리한 문헌조사논문", ap=ap))
+        deck.table(slide, [tr("인용 키"), tr("읽으면 좋은 이유")], rows[:10], [5.0, 26.8], size=11)
 
 
 def main() -> None:
@@ -1022,6 +1032,7 @@ def main() -> None:
     parser.add_argument("--deck", choices=["all", "talk", "learn"], default="all")
     add_variant(parser)
     args = parser.parse_args()
+    use_language(args.run_dir)
 
     style = pptx_style()
     s = read_json(args.run_dir / variant_name("synthesis.json", args.variant))

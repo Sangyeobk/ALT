@@ -15,7 +15,7 @@ from pathlib import Path
 
 from build_pptx import TALK_SECTIONS, pptx_style
 from common import (display_names, load_config, load_topic, map_axis, read_json, report_title, review_info, scope_history, sections,
-                    topic_line, write_json)
+                    output_language, topic_line, tr, use_language, write_json)
 from export_references import EXCEL_SHEETS
 from report_facts import method_lines
 from slides_plan import (DECK_FILES, LEARN_FIGURE_PREFIX, LEARN_SECTIONS, LEARN_TAIL, check_learn_plan, check_plan, figure_choices,
@@ -24,7 +24,9 @@ from slides_plan import (DECK_FILES, LEARN_FIGURE_PREFIX, LEARN_SECTIONS, LEARN_
 
 def types_input(style: dict, catalog: dict) -> dict:
     limits = slot_limits(style, catalog)
-    return {name: {"use": kind["use"], "slots": limits[name],
+    slots = {name: {slot: [dict(lim, role=tr(lim["role"])) for lim in lims] for slot, lims in kind_limits.items()}
+             for name, kind_limits in limits.items()}  # 문단 역할 이름(양식 text_roles 등)은 결과물 언어로
+    return {name: {"use": kind["use"], "slots": slots[name],
                    **({"image": True} if "image" in kind else {}), **({"table": True} if "table" in kind else {})}
             for name, kind in catalog["types"].items()}
 
@@ -43,9 +45,9 @@ def build_input(run_dir: Path, style: dict, catalog: dict) -> dict:
         "searched_on": meta["run_at"][:10],
         "scope_history": [list(row) for row in scope_history(run_dir)],
         "sections": [{"id": sid, "name": TALK_SECTIONS[sid][0]} for sid in chosen],
-        "facts": {"prisma": meta["prisma"], "subtopics": len(s.get("subtopics", [])), "map_axis": map_axis(run_dir)["name"],
+        "facts": {"prisma": meta["prisma"], "subtopics": len(s.get("subtopics", [])), "map_axis": tr(map_axis(run_dir)["name"]),
                   "method_lines": [line for line, _ in method_lines(meta, scored["records"], load_config(), level_of, load_topic(run_dir))],
-                  "excel_sheets": [list(row) for row in EXCEL_SHEETS]},
+                  "excel_sheets": [[tr(name), tr(desc)] for name, desc in EXCEL_SHEETS]},
         "types": types_input(style, catalog),
         "figures": figure_choices(run_dir, s),
         "ref_keys": sorted(refs),
@@ -67,7 +69,7 @@ def build_learn_input(run_dir: Path, style: dict, catalog: dict) -> dict:
         "searched_on": meta["run_at"][:10],
         "names": display_names(run_dir, s, meta),
         "sections_count": LEARN_SECTIONS,
-        "tail_section": LEARN_TAIL,
+        "tail_section": [tr(line) for line in LEARN_TAIL],
         "types": types_input(style, catalog),
         "figures": [f for f in figure_choices(run_dir, s) if f["file"].startswith(LEARN_FIGURE_PREFIX)],
         "ref_keys": sorted(refs),
@@ -87,6 +89,7 @@ def main() -> None:
     parser.add_argument("--check", action="store_true")
     parser.add_argument("--deck", choices=list(DECK_FILES), default="talk")
     args = parser.parse_args()
+    use_language(args.run_dir)
     style = pptx_style()
     catalog = load_catalog(style)
     if catalog is None or style["path"] is None:
@@ -102,7 +105,7 @@ def main() -> None:
         print(f"[slides] {slides_file} {len(plan.get('slides', []))}장 — " + ("통과" if not errors else f"오류 {len(errors)}건"))
         sys.exit(1 if errors else 0)
     data = (build_learn_input if args.deck == "learn" else build_input)(args.run_dir, style, catalog)
-    write_json(args.run_dir / input_file, data)
+    write_json(args.run_dir / input_file, {**data, "language": output_language()})  # 구성안 글의 언어 (slides_guide)
     print(f"[slides] {input_file}: 장 종류 {len(data['types'])}개, 그림 {len(data['figures'])}개")
 
 

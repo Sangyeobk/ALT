@@ -21,7 +21,7 @@ from pathlib import Path
 import pypdfium2
 from pypdf import PdfReader
 
-from common import add_variant, load_config, read_json, variant_name, write_json
+from common import add_variant, load_config, read_json, run_language, variant_name, write_json
 from extract_fulltext import target_keys
 
 CAPTION_PATTERN = re.compile(r"^\s*((?:Fig\.|Figure|FIGURE|Table|TABLE)\s*\d+\s*(?:[.:|]\s*.*)?)$", re.MULTILINE)
@@ -251,7 +251,8 @@ def main() -> None:
     noted = load_notes_keys(args.run_dir)
     todo = [k for k in index if k in noted and k not in picked]  # 맥락 정리가 있어야 고를 수 있음, 이미 고른 논문은 건너뜀
     number = max((int(p.stem.rsplit("_", 1)[1]) + 1 for p in args.run_dir.glob("figure_picks_*.json")), default=1)  # 이전 고르기 덮지 않음
-    write_json(args.run_dir / "figure_batches.json", {"keys": todo, "output_file": f"figure_picks_{number}.json" if todo else None})
+    write_json(args.run_dir / "figure_batches.json", {"keys": todo, "output_file": f"figure_picks_{number}.json" if todo else None,
+                                                     "language": run_language(args.run_dir)})  # 그림 설명(caption·why)의 언어
     print(f"[figures] {len(index)}편, 캡션 있는 쪽 {sum(len(p['pages']) for p in index.values())}개 -> figure_index.json · "
           f"그림 고를 논문 {len(todo)}편" + (f" -> figure_picks_{number}.json" if todo else ""))
 

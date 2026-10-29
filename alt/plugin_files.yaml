@@ -32,6 +32,7 @@ files:
   - alt/fetch_venues.py
   - alt/figure_layout.py
   - alt/fulltext_guide.md
+  - alt/lang/en.yaml
   - alt/library.py
   - alt/make_figures.py
   - alt/merge_runs.py
@@ -72,6 +73,7 @@ files:
   - tests/test_feedback_1019.py
   - tests/test_fetch_open_access.py
   - tests/test_institution_docs.py
+  - tests/test_language.py
   - tests/test_library_replace.py
   - tests/test_make_figures.py
   - tests/test_merge_runs.py

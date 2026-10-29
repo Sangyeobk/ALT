@@ -13,7 +13,7 @@ A literature-survey plugin for Claude Code and Codex (one repository, installs i
 | `06_context.md` | Condensed context for coding / follow-up work |
 | `figures/` | Literature map, selection flow, technology tree, paper-count charts |
 
-Output text is Korean. Other output languages are not supported yet: the fixed text the code adds (section titles, table headers, method notes, Excel column names, figure labels) is Korean only. Code comments and the AI instructions (`SKILL.md`, guides) are in Korean.
+Outputs are written in **Korean or English**, chosen when you confirm the topic (English is suggested if you ask in English). The fixed text the code adds (section titles, table headers, method notes, Excel column names, figure labels) comes from [`alt/lang/en.yaml`](alt/lang/en.yaml); to add another language, copy that file to `<code>.yaml`, translate the values and add the code to `LANGUAGES` in `alt/common.py`. Code comments and the AI instructions (`SKILL.md`, guides) are in Korean.
 
 ## How it works
 1. **Define the topic** — The executing AI proposes a precise scope (included/excluded, research question, map axis) and asks you to confirm.

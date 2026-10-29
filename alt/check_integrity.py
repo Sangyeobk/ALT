@@ -15,7 +15,7 @@ from pathlib import Path
 
 import requests
 
-from common import load_config, load_user_settings, read_json, write_json
+from common import load_config, load_user_settings, read_json, tr_later, write_json
 
 CROSSREF_WORK_URL = "https://api.crossref.org/works/{doi}"
 
@@ -46,7 +46,7 @@ def judge(record: dict, notices: list[str] | None, listed: bool | None, rules: d
     flags = []
     if retracted:
         flags.append("철회됨")
-    flags += [f"공지: {n}" for n in flag_hits]
+    flags += [tr_later("공지: {notice}").format(notice=n) for n in flag_hits]  # 결과물에는 tr_stored로
     if listed is False:
         flags.append("DOAJ 미등재 OA 학술지 (확인 필요)")
     return {

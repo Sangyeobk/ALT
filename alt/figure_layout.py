@@ -8,6 +8,8 @@ from matplotlib.backends.backend_agg import FigureCanvasAgg
 from matplotlib.font_manager import FontProperties
 from matplotlib.patches import FancyBboxPatch
 
+from common import output_language
+
 POINTS_PER_INCH = 72
 FIGURE_WIDTH_PT = 756
 OUTER_PAD_PT = 14
@@ -56,7 +58,9 @@ class Diagram:
         lines = []
         for paragraph in str(text).split("\n"):
             line = ""
-            for token in re.findall(r"\s+|\S+", paragraph):
+            # 한국어 밖에서는 붙임표 뒤에서도 줄을 나눔 ('physics-inform/ed'처럼 낱말 중간에서 끊기지 않게, 2026-10-29)
+            pattern = r"\s+|\S+" if output_language() == "ko" else r"\s+|[^\s-]*-+|[^\s-]+"
+            for token in re.findall(pattern, paragraph):
                 if measured(line + token) <= limit:
                     line += token
                     continue

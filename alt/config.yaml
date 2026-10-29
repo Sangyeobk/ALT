@@ -131,7 +131,7 @@ usage:                            # [사용자 2026-10-16] 큰 단계는 5시간
   calibration_path: ~/.alt/usage_calibration.jsonl   # 단계 전후 5시간 사용률 기록 (PC마다, 계정 기준)
 
 output:
-  default_language: ko           # [사용자 2026-10-28] 지금은 한국어만 — 코드가 넣는 고정 문구(장 제목·표 머리·방법 절·엑셀 열·그림 글자)가 한국어뿐. 다국어는 제출 뒤 과제
+  default_language: ko           # [사용자 2026-10-29] 결과물 언어 기본값 (ko·en) — 조사마다 topic.json language가 우선 (define_topic.py --language). 코드 고정 문구 영어는 alt/lang/en.yaml
   default_variant: 초록            # 폐지된 판 구분(2026-10-19)의 남은 값 — 파일 이름에 붙지 않음. 읽기 방식은 common.run_reading_mode가 정함
   font: Malgun Gothic             # 그림·문서 글꼴 (맑은 고딕)
   table_keep_rows: 20             # [제안] 보고서 표가 이 행 수 이하면 쪽에서 나누지 않고 통째로 다음 쪽으로 (사용자 피드백 2026-10-19)

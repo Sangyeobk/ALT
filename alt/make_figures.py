@@ -27,7 +27,8 @@ import matplotlib.pyplot as plt  # noqa: E402
 from matplotlib.font_manager import FontProperties  # noqa: E402
 from matplotlib.patches import FancyBboxPatch  # noqa: E402
 
-from common import add_variant, axis_group, axis_labels, display_names, load_config, map_axis, read_json, role_label, variant_name  # noqa: E402
+from common import (add_variant, axis_group, axis_labels, display_names, load_config, map_axis, output_language, read_json,  # noqa: E402
+                    role_label, tr, tr_later, use_language, variant_name)
 from figure_layout import (Diagram, BAR_HEIGHT_PT, CELL_PAD_PT, OUTER_PAD_PT, ROW_GAP_PT,
                            SAVE_PAD_IN, TEXT_GAP_PT)  # noqa: E402
 
@@ -89,8 +90,8 @@ def reference_map(records: list[dict], references: dict, rules: dict, axis: dict
             if r["openalex_id"] in top_number:
                 ax.text(col + dx, row + dy, str(top_number[r["openalex_id"]]), ha="center", va="center",
                         fontsize=7, color="white", fontweight="bold", zorder=4)
-    ax.set_xticks(range(len(columns)), [c.replace("·", "·\n", 1) for c in columns], fontsize=9)
-    ax.set_yticks(range(len(rows)), rows, fontsize=10)
+    ax.set_xticks(range(len(columns)), [tick_label(c) for c in columns], fontsize=9)
+    ax.set_yticks(range(len(rows)), [tr(r) for r in rows], fontsize=10)
     ax.set_xlim(-0.5, len(columns) - 0.5)
     ax.set_ylim(-0.5, len(rows) - 0.5)
     ax.invert_yaxis()
@@ -99,28 +100,31 @@ def reference_map(records: list[dict], references: dict, rules: dict, axis: dict
     ax.grid(True, which="minor", color="#dddddd", zorder=0)
     ax.tick_params(which="minor", length=0)
     counts = {s: sum(r["status"] == s for r in pool) for s in ("selected", "review_listed")}
-    for status, label in (("selected", "핵심논문"), ("review_listed", "문헌조사논문"), ("other", "기타 후보")):
+    for status, label in (("selected", tr("핵심논문")), ("review_listed", tr("문헌조사논문")), ("other", tr("기타 후보"))):
         marker, color, alpha = MAP_STYLE[status]
         ax.scatter([], [], marker=marker, color=color, alpha=alpha, s=60, label=label,
                    edgecolors="none" if status == "other" else "black", linewidths=0.5)
     if any(r.get("update") == "NEW" for r in pool):
         ax.scatter([], [], marker="o", color=MAP_STYLE["selected"][1], s=60, edgecolors="red", linewidths=1.8,
-                   label="NEW (누적 갱신으로 새로 든 핵심논문)")
+                   label=tr("NEW (누적 갱신으로 새로 든 핵심논문)"))
     ax.legend(loc="upper left", bbox_to_anchor=(1.01, 1), fontsize=9, frameon=False)
-    ax.text(1.02, 0.8, "핵심논문 상위 (총점 순)\n" + "\n".join(f"{i}  {key_of.get(r['openalex_id'], '')}"
-                                                          + (" NEW" if r.get("update") == "NEW" else "") for i, r in enumerate(top, 1)),
+    ax.text(1.02, 0.8, tr("핵심논문 상위 (총점 순)") + "\n" + "\n".join(f"{i}  {key_of.get(r['openalex_id'], '')}"
+                                                              + (" NEW" if r.get("update") == "NEW" else "") for i, r in enumerate(top, 1)),
             transform=ax.transAxes, va="top", fontsize=9, linespacing=1.5)
-    ax.set_title(f"문헌지도 — 관련성 {rules['map_min_relevance']}점 이상 후보 {len(pool)}편 "
-                 f"(핵심논문 {counts['selected']} · 문헌조사논문 {counts['review_listed']} · 기타 {len(pool) - sum(counts.values())}), "
-                 f"원 크기 = 총점, 번호 = 핵심논문 상위 {len(top)}편", fontsize=11, loc="left")
+    ax.set_title(tr("문헌지도 — 관련성 {min_relevance}점 이상 후보 {n}편 (핵심논문 {selected} · 문헌조사논문 {reviews} · 기타 {others}), "
+                    "원 크기 = 총점, 번호 = 핵심논문 상위 {top}편", min_relevance=rules["map_min_relevance"], n=len(pool),
+                    selected=counts["selected"], reviews=counts["review_listed"], others=len(pool) - sum(counts.values()), top=len(top)),
+                 fontsize=11, loc="left")
     fig.tight_layout()
     fig.savefig(out, dpi=200, bbox_inches="tight", pad_inches=SAVE_PAD_IN)
     plt.close(fig)
 
 
-CONTINENT_KO = {"Asia": "아시아", "Europe": "유럽", "North America": "북미", "South America": "남미", "Africa": "아프리카",
-                "Oceania": "오세아니아", "Antarctica": "남극"}
-UNKNOWN_LABEL = "미상"
+# 묶음 값은 한국어 원문 그대로 (그릴 때 tr)
+CONTINENT_KO = {"Asia": tr_later("아시아"), "Europe": tr_later("유럽"), "North America": tr_later("북미"),
+                "South America": tr_later("남미"), "Africa": tr_later("아프리카"), "Oceania": tr_later("오세아니아"),
+                "Antarctica": tr_later("남극")}
+UNKNOWN_LABEL = tr_later("미상")
 
 
 def distribution_counts(pool: list[dict], key, order: list[str] | None = None) -> list[tuple[str, int, int]]:
@@ -147,16 +151,17 @@ def distribution(records: list[dict], rules: dict, axis: dict, affiliations: dic
     panels = []
     if affiliations.get("works"):
         bases = Counter((affiliations["works"].get(r["openalex_id"]) or {}).get("basis", "unknown") for r in pool)
-        panels.append((f"대륙별{chr(10)}(교신저자 {bases['corresponding']} · 1저자로 대신 {bases['first']} · 미상 {bases['unknown']})",
+        panels.append((tr("대륙별\n(교신저자 {corresponding} · 1저자로 대신 {first} · 미상 {unknown})",
+                          corresponding=bases["corresponding"], first=bases["first"], unknown=bases["unknown"]),
                        distribution_counts(pool, lambda r: continent_of(r, affiliations))))
-    panels.append((f"{axis['name']}별", distribution_counts(pool, lambda r: axis_group(r, axis), axis_labels(axis))))
+    panels.append((tr("{axis}별", axis=tr(axis["name"])), distribution_counts(pool, lambda r: axis_group(r, axis), axis_labels(axis))))
     approaches = list(dict.fromkeys(rules["approach_labels"].values()))
-    panels.append(("접근법별", distribution_counts(pool, lambda r: primary_approach(r["approach_tags"], rules["approach_labels"]),
-                                                approaches)))
+    panels.append((tr("접근법별"), distribution_counts(pool, lambda r: primary_approach(r["approach_tags"], rules["approach_labels"]),
+                                                    approaches)))
     rows = max(len(p[1]) for p in panels)
     fig, axes = plt.subplots(1, len(panels), figsize=(FIG_WIDTH_IN, 0.42 * rows + 1.6))
     for ax, (title, counts) in zip(axes, panels):
-        labels = [c[0] for c in counts]
+        labels = [tr(c[0]) for c in counts]
         y = range(len(counts))
         ax.barh(y, [c[1] - c[2] for c in counts], left=[c[2] for c in counts], color="#BFBFBF")
         ax.barh(y, [c[2] for c in counts], color=NAVY)
@@ -168,8 +173,8 @@ def distribution(records: list[dict], rules: dict, axis: dict, affiliations: dic
         ax.set_title(title, fontsize=10.5, loc="left")
         ax.spines[["top", "right"]].set_visible(False)
         ax.tick_params(axis="x", labelsize=8)
-    fig.suptitle(f"논문 수 분포 — 관련성 {rules['map_min_relevance']}점 이상 후보 {len(pool)}편 "
-                 f"(남색 = 핵심논문, 괄호 = 핵심논문 편수)", fontsize=12, x=0.01, ha="left")
+    fig.suptitle(tr("논문 수 분포 — 관련성 {min_relevance}점 이상 후보 {n}편 (남색 = 핵심논문, 괄호 = 핵심논문 편수)",
+                    min_relevance=rules["map_min_relevance"], n=len(pool)), fontsize=12, x=0.01, ha="left")
     fig.tight_layout()
     fig.savefig(out, dpi=200, bbox_inches="tight", pad_inches=SAVE_PAD_IN)
     plt.close(fig)
@@ -184,28 +189,30 @@ def prisma(meta: dict, out: Path) -> None:
     no_abstract = p.get("excluded_no_abstract", 0)  # 초록 없음 + 인용 낮음 제외 (사용자 2026-10-19)
     after_retraction = p["screened"] - p["excluded_retracted"] - no_abstract
     passed = p["selected"] + p["below_threshold"] + p["over_limit"]  # 관련성 하한 통과 (총점과 무관)
-    main = [("검색으로 찾은 문헌" + (" + 공통 인용 고전" if cocited else ""), p["identified"]), ("중복 제거 후", p["screened"]),
-            ("연구 논문 (리뷰·기관 문서 제외)", after_retraction - reviews - institutions - cocited), (f"관련성 {meta['min_relevance']}점 이상", passed),
-            ("핵심논문", p["selected"])]
-    side = [(f"중복 제거 {p['duplicates_removed']}편", 0),
-            (f"철회 제외 {p['excluded_retracted']}편" + (f" · 초록 없음·인용 낮음 제외 {no_abstract}편" if no_abstract else "")
-             + f"\n리뷰 {reviews}편 → 문헌조사논문 후보로 별도 평가\n"
-             f"(목록 {p['reviews_listed']} · 목록 외 {p['reviews_not_listed']})"
-             + (f"\n기관·선급 문서 {institutions}편 → 별도 목록 {p.get('institutions_listed', 0)}" if institutions else "")
-             + (f"\n공통 인용 고전 {cocited}편 → 별도 목록 {p.get('cocited_listed', 0)}" if cocited else ""), 1),
-            (f"관련성 {meta['min_relevance']}점 미만 {p['below_relevance']}편", 2),
-            (f"총점 {meta['min_total_score']} 미만 {p['below_threshold']}편\n상한({meta['max_selected']}편) 초과 {p['over_limit']}편", 3)]
+    main = [(tr("검색으로 찾은 문헌") + (tr(" + 공통 인용 고전") if cocited else ""), p["identified"]), (tr("중복 제거 후"), p["screened"]),
+            (tr("연구 논문 (리뷰·기관 문서 제외)"), after_retraction - reviews - institutions - cocited),
+            (tr("관련성 {min_relevance}점 이상", min_relevance=meta["min_relevance"]), passed),
+            (tr("핵심논문"), p["selected"])]  # 마지막 = 핵심논문 (노란 칸)
+    side = [(tr("중복 제거 {n}편", n=p["duplicates_removed"]), 0),
+            (tr("철회 제외 {n}편", n=p["excluded_retracted"]) + (tr(" · 초록 없음·인용 낮음 제외 {n}편", n=no_abstract) if no_abstract else "")
+             + tr("\n리뷰 {n}편 → 문헌조사논문 후보로 별도 평가\n(목록 {listed} · 목록 외 {not_listed})",
+                  n=reviews, listed=p["reviews_listed"], not_listed=p["reviews_not_listed"])
+             + (tr("\n기관·선급 문서 {n}편 → 별도 목록 {listed}", n=institutions, listed=p.get("institutions_listed", 0)) if institutions else "")
+             + (tr("\n공통 인용 고전 {n}편 → 별도 목록 {listed}", n=cocited, listed=p.get("cocited_listed", 0)) if cocited else ""), 1),
+            (tr("관련성 {min_relevance}점 미만 {n}편", min_relevance=meta["min_relevance"], n=p["below_relevance"]), 2),
+            (tr("총점 {min_total_score} 미만 {n}편\n상한({max_selected}편) 초과 {over}편", min_total_score=meta["min_total_score"],
+                n=p["below_threshold"], max_selected=meta["max_selected"], over=p["over_limit"]), 3)]
     d = Diagram()
-    y = d.title("문헌 선별 흐름도 (PRISMA 흐름도 형식 참조)")
+    y = d.title(tr("문헌 선별 흐름도 (PRISMA 흐름도 형식 참조)"))
     main_width = d.inner_width * PRISMA_MAIN_FRACTION
     side_x = d.left + main_width + TREE_BRANCH_PT
     side_width = d.width - OUTER_PAD_PT - side_x
-    main_blocks = [d.block(f"{label}\n{n}편", main_width - 2 * CELL_PAD_PT) for label, n in main]
+    main_blocks = [d.block(tr("{label}\n{n}편", label=label, n=n), main_width - 2 * CELL_PAD_PT) for label, n in main]
     side_blocks = [d.block(text, side_width - 2 * CELL_PAD_PT, size=REFERENCE_FONT_PT) for text, _ in side]
     center_x = d.left + main_width / 2
-    for i, ((label, _), block) in enumerate(zip(main, main_blocks)):
+    for i, block in enumerate(main_blocks):
         height = block.height + 2 * CELL_PAD_PT
-        d.cell(d.left, y, main_width, height, [block], YELLOW if label == "핵심논문" else "white")
+        d.cell(d.left, y, main_width, height, [block], YELLOW if i == len(main) - 1 else "white")
         y += height
         if i < len(side_blocks):
             side_block = side_blocks[i]
@@ -216,8 +223,8 @@ def prisma(meta: dict, out: Path) -> None:
             d.arrow(center_x, y + 2, center_x, next_y - 2)
             d.arrow(center_x, (y + next_y) / 2, side_x - 2, (y + next_y) / 2)
             y = next_y
-    note = d.block(f"+ 문헌조사논문(본문 기여 평가 통과) {p['reviews_listed']}편"
-                   + (f" · 기관·선급 문서 {p.get('institutions_listed', 0)}편" if institutions else ""),
+    note = d.block(tr("+ 문헌조사논문(본문 기여 평가 통과) {n}편", n=p["reviews_listed"])
+                   + (tr(" · 기관·선급 문서 {n}편", n=p.get("institutions_listed", 0)) if institutions else ""),
                    d.inner_width, size=REFERENCE_FONT_PT, color="#185FA5")
     d.text(note, d.left, y + ROW_GAP_PT)
     d.save(out, y + ROW_GAP_PT + note.height)
@@ -237,10 +244,11 @@ def gap_matrix(records: list[dict], rules: dict, axis: dict, out: Path) -> int:
         for j, v in enumerate(row):
             ax.text(j, i, str(v) if v else "·", ha="center", va="center", fontsize=10,
                     color="white" if v > peak * 0.6 else ("#A32D2D" if v == 0 else "black"))
-    ax.set_xticks(range(len(groups)), [g.replace("·", "·\n", 1) for g in groups], fontsize=9)
-    ax.set_yticks(range(len(approaches)), approaches, fontsize=10)
-    ax.set_title(f"후보 문헌 분포 — 관련성 {rules['gap_matrix_min_relevance']}점 이상 후보 {len(pool)}편, 접근법 × {axis['name']} "
-                 "(접근법 중복 포함: 칸 합계 ≠ 편수 · = 조사 표본 내 미확인)",
+    ax.set_xticks(range(len(groups)), [tick_label(g) for g in groups], fontsize=9)
+    ax.set_yticks(range(len(approaches)), [tr(a) for a in approaches], fontsize=10)
+    ax.set_title(tr("후보 문헌 분포 — 관련성 {min_relevance}점 이상 후보 {n}편, 접근법 × {axis} "
+                    "(접근법 중복 포함: 칸 합계 ≠ 편수 · = 조사 표본 내 미확인)",
+                    min_relevance=rules["gap_matrix_min_relevance"], n=len(pool), axis=tr(axis["name"])),
                  fontsize=11, loc="left")
     fig.tight_layout()
     fig.savefig(out, dpi=200, bbox_inches="tight", pad_inches=SAVE_PAD_IN)
@@ -249,9 +257,14 @@ def gap_matrix(records: list[dict], rules: dict, axis: dict, out: Path) -> int:
 
 
 # ---------- 배경 이론 + 문헌 통계 ----------
-UNKNOWN_SOURCE = "미기재"
+UNKNOWN_SOURCE = tr_later("미기재")  # 자료 종류 코드 (그릴 때 tr)
 SOURCE_COLORS = ["#185FA5", "#70AD47", "#C00000", "#BFBFBF"]  # 설정의 자료 종류 순서 + 미기재(마지막)
 NAVY, YELLOW, GRAY_FILL = "#002060", "#FFF2CC", "#F2F2F2"
+
+
+def source_legend_items(labels: list[str]) -> list[tuple[str, str]]:
+    """자료 종류 범례 (표시 이름, 색) — 설정 값은 코드로 두고 표시만 번역."""
+    return [(tr(label), color) for label, color in zip(labels + [UNKNOWN_SOURCE], SOURCE_COLORS)]
 
 
 def source_counts(keys: list[str], source_of: dict, labels: list[str]) -> dict:
@@ -304,8 +317,16 @@ def role_summary(s: dict, labels: list[str]) -> list[dict]:
     return rows
 
 
+LATIN_WRAP_FACTOR = 2  # width는 한글 글자 수 기준 — 라틴 글자는 대략 한글 반 폭이라 그만큼 더 넣음 (한국어 결과는 그대로)
+
+
 def wrap(text: str, width: int) -> str:
-    return textwrap.fill(text, width, break_long_words=False)
+    return textwrap.fill(text, width if output_language() == "ko" else width * LATIN_WRAP_FACTOR, break_long_words=False)
+
+
+def tick_label(label: str) -> str:
+    """가로축 눈금 이름 (묶음 값은 코드 — 표시만 번역): 한국어는 첫 '·'에서 줄바꿈, 다른 언어는 길이로 줄바꿈 (이웃 칸과 겹치지 않게)."""
+    return label.replace("·", "·\n", 1) if output_language() == "ko" else wrap(tr(label), 8)
 
 
 FIG_WIDTH_IN = 10.5  # 보고서 폭 16.5 cm(6.5인치)에 넣으면 약 0.62배 → 글자 13 pt ≈ 보고서 8 pt (사용자 피드백 2026-10-15: 글이 너무 작음)
@@ -340,18 +361,18 @@ def source_legend(ax, x: float, y: float, labels: list[str], fontsize: float = 1
 def theory_flow(stages: list[dict], labels: list[str], out: Path, approach: str) -> None:
     """같은 문헌 통계를 측정한 글자 폭과 가변 행 높이로 배치한다."""
     d = Diagram()
-    y = d.title(f"기술 흐름에서 {approach} 연구의 위치 — 기존 방법과 핵심논문의 위치·근거 자료")
+    y = d.title(tr("기술 흐름에서 {approach} 연구의 위치 — 기존 방법과 핵심논문의 위치·근거 자료", approach=approach))
     label_width = d.inner_width * FLOW_LABEL_FRACTION
     col_width = (d.inner_width - label_width) / len(stages)
     box_width = col_width - ROW_GAP_PT
     text_width = box_width - 2 * CELL_PAD_PT
     headings = [d.block(st["name"], text_width, weight="bold") for st in stages]
     methods = [d.block(st["method"], text_width, color="#404040") for st in stages]
-    topics = [[d.block(f"{name} {count}편", text_width) for name, count, _ in st["subtopics"]] for st in stages]
+    topics = [[d.block(tr("{name} {n}편", name=name, n=count), text_width) for name, count, _ in st["subtopics"]] for st in stages]
     row_labels = [d.block(label, label_width - CELL_PAD_PT, weight="bold", color=NAVY) for label in
-                  ("공학적 흐름", "기존 방법\n[일반 개념]", f"{approach}\n연구 (편수)", "학습·검증 자료")]
-    count_blocks = [d.block(f"{st['papers']}편", text_width) for st in stages]
-    no_topics = d.block("해당 단계\n분야 없음", text_width, color="#7F7F7F")
+                  (tr("공학적 흐름"), tr("기존 방법\n[일반 개념]"), tr("{approach}\n연구 (편수)", approach=approach), tr("학습·검증 자료"))]
+    count_blocks = [d.block(tr("{n}편", n=st["papers"]), text_width) for st in stages]
+    no_topics = d.block(tr("해당 단계\n분야 없음"), text_width, color="#7F7F7F")
     heights = [max(b.height for b in headings) + 2 * CELL_PAD_PT,
                max(b.height for b in methods) + 2 * CELL_PAD_PT,
                max([sum(b.height + BAR_HEIGHT_PT + 2 * TEXT_GAP_PT for b in bs) for bs in topics]
@@ -388,19 +409,20 @@ def theory_flow(stages: list[dict], labels: list[str], out: Path, approach: str)
             d.text(count_blocks[i], x + CELL_PAD_PT, sy + BAR_HEIGHT_PT + TEXT_GAP_PT)
     for top, height in zip(tops[:-1], heights[:-1]):
         d.ax.plot([d.left, d.width - OUTER_PAD_PT], [top + height + ROW_GAP_PT / 2] * 2, color="#D9D9D9", lw=0.8)
-    bottom = d.legend(list(zip(labels + [UNKNOWN_SOURCE], SOURCE_COLORS)) + [("분야: 핵심", NAVY), ("분야: 활용", "#8FAADC")], y)
+    bottom = d.legend(source_legend_items(labels) + [(tr("분야: 핵심"), NAVY), (tr("분야: 활용"), "#8FAADC")], y)
     d.save(out, bottom)
 
 
 def limit_response(rows: list[dict], labels: list[str], out: Path, approach: str) -> None:
     """표형 그림: 왼쪽·세로 가운데 정렬, 긴 역할·대상·인용도 칸 안에서 줄바꿈."""
     d = Diagram()
-    y = d.title(f"기존 방법의 한계와 {approach}의 대응 (편수는 핵심논문, 자료는 중복 포함)")
+    y = d.title(tr("기존 방법의 한계와 {approach}의 대응 (편수는 핵심논문, 자료는 중복 포함)", approach=approach))
     width = (d.inner_width - 3 * ROW_GAP_PT) / 4
     content_width = width - 2 * CELL_PAD_PT
     xs = [d.left + i * (width + ROW_GAP_PT) for i in range(4)]
     headings = [d.block(t, content_width, weight="bold", color=NAVY) for t in
-                ("기존 방법의 한계\n[일반 개념]", f"{approach}\n→ 예측 대상", "근거: 핵심논문 편수\n· 학습·검증 자료", "확인해야 할 성능")]
+                (tr("기존 방법의 한계\n[일반 개념]"), tr("{approach}\n→ 예측 대상", approach=approach),
+                 tr("근거: 핵심논문 편수\n· 학습·검증 자료"), tr("확인해야 할 성능"))]
     header_height = max(b.height for b in headings) + 2 * CELL_PAD_PT
     for x, block in zip(xs, headings):
         d.text(block, x + CELL_PAD_PT, y, header_height)
@@ -411,8 +433,8 @@ def limit_response(rows: list[dict], labels: list[str], out: Path, approach: str
         role = d.block(row["role"], content_width, weight="bold", color=NAVY)
         target = d.block(row["target"], content_width)
         check = d.block(row["check"], content_width)
-        reps = d.block("예: " + ", ".join(row["reps"]), content_width, size=REFERENCE_FONT_PT, color="#404040")
-        count = d.block(f"{row['papers']}편", content_width, weight="bold")
+        reps = d.block(tr("예: {keys}", keys=", ".join(row["reps"])), content_width, size=REFERENCE_FONT_PT, color="#404040")
+        count = d.block(tr("{n}편", n=row["papers"]), content_width, weight="bold")
         evidence_height = count.height + 2 * BAR_HEIGHT_PT + 3 * TEXT_GAP_PT + reps.height
         height = max(limit.height, role.height + TEXT_GAP_PT + target.height, check.height, evidence_height) + 2 * CELL_PAD_PT
         d.cell(xs[0], y, width, height, [limit], GRAY_FILL)
@@ -429,7 +451,7 @@ def limit_response(rows: list[dict], labels: list[str], out: Path, approach: str
         ey += BAR_HEIGHT_PT + TEXT_GAP_PT
         d.text(reps, xs[2] + CELL_PAD_PT, ey)
         y += height + ROW_GAP_PT
-    d.save(out, d.legend(list(zip(labels + [UNKNOWN_SOURCE], SOURCE_COLORS)), y))
+    d.save(out, d.legend(source_legend_items(labels), y))
 
 
 TREE_MAX_METHODS, TREE_MAX_REPS = 4, 3  # 계통도: 분야당 기법 잎·대표 키 최대 수
@@ -456,7 +478,7 @@ def tree_summary(s: dict) -> list[dict]:
 def tech_tree(groups: list[dict], root: str, out: Path) -> None:
     """역할→분야→기법: 각 노드와 가지의 실제 글자 크기로 높이를 정한다."""
     d = Diagram()
-    y = d.title("기술 계통도 — 역할 → 분야(핵심논문 편수·대표 연구) → 대표 기법")
+    y = d.title(tr("기술 계통도 — 역할 → 분야(핵심논문 편수·대표 연구) → 대표 기법"))
     subs = [t for g in groups for t in g["subtopics"]]
     col_width = d.inner_width / len(subs)
     box_width = col_width - TEXT_GAP_PT
@@ -471,8 +493,9 @@ def tech_tree(groups: list[dict], root: str, out: Path) -> None:
                            weight="bold", color="white" if g["role"] == "핵심" else "black") for g in groups]
     role_height = max(b.height for b in role_blocks) + 2 * CELL_PAD_PT
     sub_top = role_top + role_height + TREE_BRANCH_PT
-    names = [d.block(f"{t['name']}\n{t['papers']}편", content_width, weight="bold") for t in subs]
-    reps = [d.block("예: " + ", ".join(t["reps"]), content_width, size=REFERENCE_FONT_PT, color="#595959") if t["reps"] else None for t in subs]
+    names = [d.block(tr("{name}\n{n}편", name=t["name"], n=t["papers"]), content_width, weight="bold") for t in subs]
+    reps = [d.block(tr("예: {keys}", keys=", ".join(t["reps"])), content_width, size=REFERENCE_FONT_PT, color="#595959")
+            if t["reps"] else None for t in subs]
     sub_height = max(a.height + (TEXT_GAP_PT + b.height if b else 0) for a, b in zip(names, reps)) + 2 * CELL_PAD_PT
 
     def elbow(x0, y0, x1, y1):
@@ -545,9 +568,9 @@ def slide_flow(stages: list[dict], out: Path) -> None:
             ax.annotate("", (x + w + gap - 0.05, 8.4), (x + w + 0.05, 8.4), arrowprops=dict(arrowstyle="-|>", color=LIGHT, lw=2))
         ax.text(x + w / 2, 5.6, wrap(st["method"], 10), ha="center", va="center", fontsize=13, color=MID, linespacing=1.2)
         ax.plot([x, x + w], [3.9, 3.9], color=LIGHT, lw=1)
-        ax.text(x + w / 2, 2.5, f"{st['papers']}편" if st["papers"] else "–", ha="center", va="center", fontsize=26,
+        ax.text(x + w / 2, 2.5, tr("{n}편", n=st["papers"]) if st["papers"] else "–", ha="center", va="center", fontsize=26,
                 fontweight="bold", color=DARK)
-        ax.text(x + w / 2, 1.1, f"분야 {len(st['subtopics'])}개" if st["subtopics"] else "분야 없음", ha="center", va="center",
+        ax.text(x + w / 2, 1.1, tr("분야 {n}개", n=len(st["subtopics"])) if st["subtopics"] else tr("분야 없음"), ha="center", va="center",
                 fontsize=12, color=MID)
     _save_slide(fig, out)
 
@@ -562,7 +585,7 @@ def slide_limits(rows: list[dict], out: Path) -> None:
         ax.text(0.2, mid, wrap(r["limit"], 26), va="center", fontsize=13, color=MID, linespacing=1.2)
         ax.annotate("", (11.3, mid), (10.1, mid), arrowprops=dict(arrowstyle="-|>", color=LIGHT, lw=2))
         _tab(ax, 11.5, mid - pitch * 0.32, 6.6, pitch * 0.64, wrap(r["role"], 12), size=15)
-        ax.text(19.0, mid, f"{r['papers']}편", va="center", fontsize=22, fontweight="bold", color=DARK)
+        ax.text(19.0, mid, tr("{n}편", n=r["papers"]), va="center", fontsize=22, fontweight="bold", color=DARK)
         if i < n - 1:
             ax.plot([0.2, width - 0.2], [mid - pitch / 2, mid - pitch / 2], color=LIGHT, lw=0.8)
     _save_slide(fig, out)
@@ -588,7 +611,7 @@ def slide_tree(groups: list[dict], root: str, out: Path) -> None:
             ax.add_patch(plt.Rectangle((x - col / 2 + 0.15, 0.4), col - 0.3, 4.4, fc="white", ec=LIGHT, lw=1.2))
             ax.text(x, 3.3, wrap(t["name"], max(4, int(col / 0.42))), ha="center", va="center", fontsize=12.5,
                     fontweight="bold", color=DARK, linespacing=1.15)
-            ax.text(x, 1.2, f"{t['papers']}편", ha="center", va="center", fontsize=18, fontweight="bold", color=DARK)
+            ax.text(x, 1.2, tr("{n}편", n=t["papers"]), ha="center", va="center", fontsize=18, fontweight="bold", color=DARK)
         start += len(g["subtopics"])
     _save_slide(fig, out)
 
@@ -598,6 +621,7 @@ def main() -> None:
     parser.add_argument("run_dir", type=Path)
     add_variant(parser)
     args = parser.parse_args()
+    use_language(args.run_dir)
 
     rules = load_config()["output"]
     plt.rcParams["font.family"] = rules["font"]

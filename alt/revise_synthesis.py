@@ -23,7 +23,7 @@ from datetime import datetime
 from pathlib import Path
 
 from check_citations import KEY_PATTERN
-from common import add_variant, load_config, load_user_style, read_json, variant_name, write_json
+from common import add_variant, load_config, load_user_style, read_json, run_language, variant_name, write_json
 
 SHAPE = load_config()["revision"]
 RULES = [
@@ -206,7 +206,7 @@ def extract(run_dir: Path, variant: str, targets: list[str], feedback: str) -> d
         "targets": parts, "papers": papers,
         "citable": [{"key": k, "title": r.get("title")} for k, r in references.items()],
         "keywords": synthesis.get("keywords"), "terms": synthesis.get("terms"),
-        "outline": outline(synthesis), "user_style": load_user_style(run_dir),
+        "outline": outline(synthesis), "user_style": load_user_style(run_dir), "language": run_language(run_dir),
         "rules": RULES, "output_file": variant_name("revision_output.json", variant), "output_format": OUTPUT_FORMAT,
     }
     write_json(run_dir / variant_name("revision_input.json", variant), payload)

@@ -16,8 +16,8 @@
 추가 규칙
 - 초록이 없으면 제목으로만 판단하고 `low_confidence: true`로 표시한다.
 - 리뷰 논문은 주제가 맞으면 점수를 깎지 않는다.
-- `reason`은 한국어 한 문장, 점수의 근거가 된 초록 내용을 짚는다.
+- `reason`은 입력 `language`의 언어(ko 한국어, en 영어; 없으면 한국어)로 한 문장, 점수의 근거가 된 초록 내용을 짚는다.
 - `approach`: 논문이 쓴 접근법 (theory / experiment / CFD / data-driven / hybrid / other 중 해당하는 것 모두)
 - `is_review`: 리뷰·서베이·state-of-the-art 논문(다른 연구를 모아 정리한 논문)이면 true
-- `axis_group`·`axis_reason` (입력에 `axis`가 있을 때만): `axis.groups` 묶음 이름 하나를 글자 그대로 (`hints` 낱말은 예시일 뿐 — 같은 뜻이면 그 묶음, 여러 묶음에 걸치면 논문의 중심 하나). 제목·초록에 근거가 없으면 `axis.unknown_label` — 추측 배정 안 함. `axis_reason`은 한국어 한 문장 (근거 문구)
+- `axis_group`·`axis_reason` (입력에 `axis`가 있을 때만): `axis.groups` 묶음 이름 하나를 글자 그대로 (`hints` 낱말은 예시일 뿐 — 같은 뜻이면 그 묶음, 여러 묶음에 걸치면 논문의 중심 하나). 제목·초록에 근거가 없으면 `axis.unknown_label` — 추측 배정 안 함. `axis_reason`은 `reason`과 같은 언어로 한 문장 (근거 문구)
 - `structure_type`: 연구 대상 (구조물·선종·장치 등 주제에 맞는 것. 해양구조물 예: monopile, jacket, FPSO, TLP, spar, semi-submersible, floating wind, fixed platform, vessel, generic, none)

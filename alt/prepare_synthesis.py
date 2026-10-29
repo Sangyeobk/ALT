@@ -14,7 +14,7 @@ from collections import Counter
 from pathlib import Path
 
 from add_institution_docs import load_user_docs
-from common import (KEY_REGISTRY, candidate_distribution, key_registry, load_config, load_topic, load_user_style, map_axis, read_json, run_reading_mode,
+from common import (KEY_REGISTRY, candidate_distribution, key_registry, load_config, load_topic, load_user_style, map_axis, read_json, run_language, run_reading_mode,
                     variant_name, write_json)
 
 CITABLE_STATUS = ("selected", "review_listed", "institution_listed")  # 기관·선급 문서도 인용 가능 (사용자 결정 2026-10-16)
@@ -141,7 +141,7 @@ def main() -> None:
     records = scored["records"]
     input_name = variant_name("synthesis_input.json", variant)
     write_json(args.run_dir / input_name, {
-        "meta": {**scored["meta"], "reading_mode": args.reading_mode, "review_levels": dict(levels),
+        "meta": {**scored["meta"], "reading_mode": args.reading_mode, "review_levels": dict(levels), "language": run_language(args.run_dir),
                  "year_counts": dict(sorted(Counter(r["year"] for r in records).items())),
                  "candidate_distribution": candidate_distribution(records, load_config()["output"], map_axis(args.run_dir)),
                  "user_style": load_user_style(args.run_dir),  # 개인 스타일 (report_guide.md보다 우선)

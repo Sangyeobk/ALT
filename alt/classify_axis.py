@@ -16,7 +16,7 @@ from collections import Counter
 from datetime import datetime
 from pathlib import Path
 
-from common import PACKAGE_DIR, axis_group, axis_labels, key_registry, load_config, map_axis, read_json, write_json
+from common import PACKAGE_DIR, axis_group, axis_labels, key_registry, load_config, map_axis, read_json, run_language, write_json
 from prepare_synthesis import load_fulltext_notes
 
 RUBRIC_PATH = PACKAGE_DIR / "axis_rubric.md"
@@ -63,7 +63,7 @@ def prepare(run_dir: Path, batches: int, fulltext_only: bool) -> int:
     papers = [{"openalex_id": r["openalex_id"], "title": r["title"], "abstract": (r.get("abstract") or "")[:chars] or None,
                **({"fulltext": notes[r["openalex_id"]]} if r["openalex_id"] in notes else {})} for r in pool]
     head = {"axis": {"name": axis["name"], "groups": [{"name": g, "hints": w} for g, w in axis["groups"][:-1]]},
-            "unknown_label": axis["groups"][-1][0], "rubric": RUBRIC_PATH.read_text(encoding="utf-8")}
+            "unknown_label": axis["groups"][-1][0], "rubric": RUBRIC_PATH.read_text(encoding="utf-8"), "language": run_language(run_dir)}
     tokens = sum(len(str(p)) for p in papers) // load_config()["fulltext"]["chars_per_token"]
     # 읽을 글이 작으면 묶음 1개 — 에이전트 고정 문맥(약 12k)이 글보다 커서 나누면 더 든다 (2026-10-16: 7편 3.5k를 2묶음으로 나눔)
     count = 1 if tokens < load_config()["relevance"]["axis_batch_min_tokens"] else max(1, min(batches, len(papers)))

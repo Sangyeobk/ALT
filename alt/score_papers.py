@@ -29,7 +29,7 @@ from pathlib import Path
 
 from add_cocited import cocited_count, is_cocited
 from classify_axis import notes_by_id
-from common import RELEVANCE_PASSED, load_config, read_json, scoring_config, write_json
+from common import RELEVANCE_PASSED, load_config, read_json, scoring_config, tr_later, write_json
 from review_contribution import contribution_votes, review_eval_files
 
 
@@ -239,10 +239,10 @@ def score(run_dir: Path, config: dict) -> dict:
         if judged.get("low_confidence"):
             flags.append("초록 없음 (제목으로 채점 — 전문 확인 필요)")
         if judged.get("verified") and judged["relevance_original"] != judged["verifier_relevance"]:
-            flags.append(f"교차 검증 이견: {judged['relevance_original']}점 vs {judged['verifier']} "
-                         f"{judged['verifier_relevance']}점 → 낮은 점수 채택")
+            flags.append(tr_later("교차 검증 이견: {original}점 vs {verifier} {score}점 → 낮은 점수 채택").format(
+                original=judged["relevance_original"], verifier=judged["verifier"], score=judged["verifier_relevance"]))
         if relevance_score < judged["relevance"]:
-            flags.append(f"초록 없음 → 관련성 {judged['relevance']}점을 상한 {relevance_score}점으로")
+            flags.append(tr_later("초록 없음 → 관련성 {relevance}점을 상한 {cap}점으로").format(relevance=judged["relevance"], cap=relevance_score))
         category = document_category(record, rules["institutions"])
         base_score = weighted_total(parts, rules["weights"])
         record.update({
